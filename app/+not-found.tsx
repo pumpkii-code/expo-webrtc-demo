@@ -1,3 +1,10 @@
+/*
+ * @Author: tonyYo
+ * @Date: 1985-10-26 16:15:00
+ * @LastEditors: tonyYo
+ * @LastEditTime: 2025-05-13 14:11:49
+ * @FilePath: /expo-webrtc-demo/app/+not-found.tsx
+ */
 import { Link, Stack } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
@@ -10,7 +17,7 @@ export default function NotFoundScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>This screen doesn't exist.</Text>
 
-        <Link href="/" style={styles.link}>
+        <Link href="/route-link" style={styles.link}>
           <Text style={styles.linkText}>Go to home screen!</Text>
         </Link>
       </View>

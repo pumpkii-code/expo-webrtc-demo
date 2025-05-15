@@ -3,7 +3,7 @@
     "name": "expo-webrtc-demo",
     "slug": "expo-webrtc-demo",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "expowebrtcdemo",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tonyy0.expo-webrtc-demo",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "需要访问麦克风来进行音视频通话",
+        "NSCameraUsageDescription": "需要访问相机来进行视频通话"
+      }
     },
     "android": {
       "adaptiveIcon": {
