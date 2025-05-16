@@ -2,12 +2,12 @@
  * @Author: tonyYo
  * @Date: 2025-05-13 11:49:36
  * @LastEditors: tonyYo
- * @LastEditTime: 2025-05-14 17:02:10
- * @FilePath: /expo-webrtc-demo/app/route-link/index.tsx
+ * @LastEditTime: 2025-05-16 11:44:03
+ * @FilePath: /expo-webrtc-demo/app/index.tsx
  */
 import { useState } from 'react';
 import { View, StyleSheet, TextInput } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 
@@ -16,6 +16,7 @@ export default function RouteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      
       <TextInput
         style={styles.input}
         placeholder="输入设备号"

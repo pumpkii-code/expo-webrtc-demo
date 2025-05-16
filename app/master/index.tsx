@@ -18,7 +18,7 @@ export default function MasterScreen() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const {serno: peerId} = useRoute().params as {serno: string};
+  const {serno: peerId} = (useRoute().params ?? {serno: ''}) as {serno: string};
 
   // 使用 Map 存储每个观众的连接
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -177,7 +177,6 @@ export default function MasterScreen() {
   };
 
   useEffect(() => {
-    startBroadcasting();
     const cleanup = () => {
       console.log('[MASTER] 执行清理函数');
       if (localStream) {
@@ -185,6 +184,7 @@ export default function MasterScreen() {
           track.stop();
           track.enabled = false; // 明确禁用轨道
         });
+        setLocalStream(null); // 重要：清空状态
       }
       // 清理所有连接
       peerConnections.current.forEach(pc => {
@@ -197,6 +197,7 @@ export default function MasterScreen() {
         signalingClient.current = null;
       }
     };
+    startBroadcasting();
     return cleanup;
    
   }, []);
