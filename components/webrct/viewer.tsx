@@ -108,6 +108,7 @@ export default function Viewer({wsUrl, masterId}: ViewerProps) {
   useEffect(() => {
     startViewing();
     return () => {
+
       if (signalingClient.current) {
         signalingClient.current.disconnect();
       }

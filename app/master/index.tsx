@@ -10,12 +10,12 @@ import { Text, View } from '@/components/Themed';
 import { SignalingClient } from '@/lib/signal';
 import { useRoute } from '@react-navigation/native';
 
-
-
 const wsUrl = 'ws://192.168.3.207:8080';
 
 export default function MasterScreen() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const  localStreamRef = useRef<MediaStream | null>(localStream);
+  localStreamRef.current = localStream;
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const {serno: peerId} = (useRoute().params ?? {serno: ''}) as {serno: string};
@@ -170,21 +170,24 @@ export default function MasterScreen() {
 
   // 开始推流
   const startBroadcasting = async () => {
+    console.log('[MASTER] 开始推流');
     const stream = await setupCamera();
     if (stream) {
       connectSignaling(wsUrl, stream);
     }
+    return stream
   };
 
   useEffect(() => {
     const cleanup = () => {
+      const strem = localStreamRef.current;
       console.log('[MASTER] 执行清理函数');
-      if (localStream) {
-        localStream.getTracks().forEach(track => {
-          track.stop();
-          track.enabled = false; // 明确禁用轨道
-        });
-        setLocalStream(null); // 重要：清空状态
+      if (strem) {
+        // strem.getTracks().forEach(track => {
+        //   track.stop();
+        //   track.enabled = false; // 明确禁用轨道
+        // });
+        strem.release(); // 释放资源
       }
       // 清理所有连接
       peerConnections.current.forEach(pc => {
@@ -198,7 +201,7 @@ export default function MasterScreen() {
       }
     };
     startBroadcasting();
-    return cleanup;
+    return ()=> cleanup();
    
   }, []);
 

@@ -1,5 +1,5 @@
 // @/lib/rtc/hook.ts (示例修改)
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { RTCPeerConnection, MediaStream, mediaDevices } from 'react-native-webrtc';
 
 interface UseWebRTCOptions {
@@ -33,11 +33,16 @@ export function useWebRTC({ role, iceServers = [{ urls: 'stun:stun.l.google.com:
             pc.current.close(); // 这是关键的清理步骤
         }
         pc.current = null; // 丢弃对旧实例的引用
-        setStream(null);
         setError(null);
         setConnectionState('closed'); // 更新状态
         console.log(`[${role.toUpperCase()}] WebRTC cleanup complete.`);
     }, [role]);
+
+    useEffect(() => {
+        return () => {
+            stream?.release();
+        }
+    }, [stream])
 
 
     const setupWebRTC = useCallback(async () => {

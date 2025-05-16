@@ -1,13 +1,29 @@
 import { RTCIceCandidate, RTCSessionDescription } from 'react-native-webrtc';
 
 export type SignalingMessage = {
-    eventName: '__register' | '__registered' | '__connectto' | '__incoming_connection' | '__offer' | '__answer' | '__candidate';
+    eventName: '__offer' | '__answer'
     data: {
-        peerId?: string;
         to: string;
         from: string;
         sdp?: string;
+    };
+} | {
+    eventName: '__register' | '__registered'
+    data: {
+        peerId: string;
+    };
+} | {
+    eventName: '__connectto' | '__incoming_connection'
+    data: {
+        to: string;
+        from: string;
+    };
+} | {
+    eventName: '__candidate';
+    data: {
+        from: string;
         candidate?: RTCIceCandidate;
+        to: string;
     };
 };
 
