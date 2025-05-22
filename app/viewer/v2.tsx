@@ -5,20 +5,17 @@
  * @LastEditTime: 2025-05-16 11:50:23
  * @FilePath: /expo-webrtc-demo/app/viewer/index.tsx
  */
-import Viewer from "@/components/webrct/viewer";
+import TestComponent from "@/components/webrct/viewer_v2";
 import { useRoute } from "@react-navigation/native";
 
 
 
-const wsUrl = 'ws://192.168.3.65:8080';
+const wsUrl = 'ws://webrtc.qq-kan.com/';
 
 export default function ViewerScreen() {
 
-  // 获取params
-  const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
-
   return (
-    <Viewer wsUrl={wsUrl} masterId={peerId} />
+    <TestComponent wsurl={wsUrl} />
   );
 }
 

@@ -55,25 +55,33 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-       
+
       <Stack
         initialRouteName='home/index'
-        screenOptions={{ 
-          headerShown: false, 
+        screenOptions={{
+          headerShown: false,
           orientation: 'portrait_up'  // 添加这行来强制横屏
-      }}>
-          <Stack.Screen 
-          name="viewer/index" 
-          options={{ 
-            headerShown: false, 
+        }}>
+        <Stack.Screen
+          name="viewer/index"
+          options={{
+            headerShown: false,
             orientation: 'landscape',  // 添加这行来强制横屏
             animation: 'none'
           }}
         />
-        <Stack.Screen 
-          name="master/index" 
-          options={{ 
-            headerShown: false, 
+        <Stack.Screen
+          name="viewer/v2"
+          options={{
+            headerShown: false,
+            orientation: 'landscape',  // 添加这行来强制横屏
+            animation: 'none'
+          }}
+        />
+        <Stack.Screen
+          name="master/index"
+          options={{
+            headerShown: false,
             orientation: 'landscape',  // 添加这行来强制横屏
             animation: 'none'
           }}

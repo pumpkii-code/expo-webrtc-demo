@@ -10,15 +10,15 @@ import { Text, View } from '@/components/Themed';
 import { SignalingClient } from '@/lib/signal';
 import { useRoute } from '@react-navigation/native';
 
-const wsUrl = 'ws://192.168.3.207:8080';
+const wsUrl = 'ws://192.168.3.65:8080';
 
 export default function MasterScreen() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const  localStreamRef = useRef<MediaStream | null>(localStream);
+  const localStreamRef = useRef<MediaStream | null>(localStream);
   localStreamRef.current = localStream;
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const {serno: peerId} = (useRoute().params ?? {serno: ''}) as {serno: string};
+  const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
 
   // 使用 Map 存储每个观众的连接
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -86,7 +86,7 @@ export default function MasterScreen() {
     }
   };
 
-  
+
   // 创建并发送 offer
   const createAndSendOffer = async (viewerId: string, stream?: MediaStream) => {
     if (!stream) {
@@ -104,7 +104,7 @@ export default function MasterScreen() {
         offerToReceiveVideo: true
       });
       await peerConnection.setLocalDescription(offer);
-      
+
       if (signalingClient.current) {
         signalingClient.current.sendOffer(offer.sdp, viewerId);
       }
@@ -115,10 +115,10 @@ export default function MasterScreen() {
   };
 
   // 连接信令服务器
-  const connectSignaling = (serverUrl: string, stream:MediaStream) => {
+  const connectSignaling = (serverUrl: string, stream: MediaStream) => {
     console.log('开始连接信令服务器');
     signalingClient.current = new SignalingClient(serverUrl);
-    
+
     signalingClient.current.connect({
       onConnected: () => {
         setConnected(true);
@@ -201,8 +201,8 @@ export default function MasterScreen() {
       }
     };
     startBroadcasting();
-    return ()=> cleanup();
-   
+    return () => cleanup();
+
   }, []);
 
   return (

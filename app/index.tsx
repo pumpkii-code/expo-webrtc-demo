@@ -16,14 +16,24 @@ export default function RouteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      
+
       <TextInput
         style={styles.input}
         placeholder="输入设备号"
         onChangeText={setSerno}
         value={serno}
       />
-      
+
+      <Link
+        href={{
+          pathname: '/viewer/v2',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        查看直播间(v2)
+      </Link>
+
       <Link
         href={{
           pathname: '/viewer',
