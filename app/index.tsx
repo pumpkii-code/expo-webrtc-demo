@@ -12,36 +12,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 
 export default function RouteScreen() {
-  const [serno, setSerno] = useState('111');
-
   return (
     <SafeAreaView style={styles.container}>
-      
-      <TextInput
-        style={styles.input}
-        placeholder="输入设备号"
-        onChangeText={setSerno}
-        value={serno}
-      />
-      
+
       <Link
         href={{
           pathname: '/viewer',
-          params: { serno }
+          params: { serno: 'RHZL-00-WTSN-9S3D-00000727' }
         }}
         style={styles.link}
       >
-        查看直播间
-      </Link>
-
-      <Link
-        href={{
-          pathname: '/master',
-          params: { serno }
-        }}
-        style={styles.link}
-      >
-        我的直播间
+        Viewer V2
       </Link>
     </SafeAreaView>
   );

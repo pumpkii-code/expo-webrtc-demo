@@ -14,7 +14,6 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
-import { View } from 'react-native';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -55,25 +54,17 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-       
+
       <Stack
         initialRouteName='home/index'
-        screenOptions={{ 
-          headerShown: false, 
+        screenOptions={{
+          headerShown: false,
           orientation: 'portrait_up'  // 添加这行来强制横屏
-      }}>
-          <Stack.Screen 
-          name="viewer/index" 
-          options={{ 
-            headerShown: false, 
-            orientation: 'landscape',  // 添加这行来强制横屏
-            animation: 'none'
-          }}
-        />
-        <Stack.Screen 
-          name="master/index" 
-          options={{ 
-            headerShown: false, 
+        }}>
+        <Stack.Screen
+          name="viewer/index"
+          options={{
+            headerShown: false,
             orientation: 'landscape',  // 添加这行来强制横屏
             animation: 'none'
           }}

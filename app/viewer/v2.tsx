@@ -7,7 +7,6 @@
  */
 import TestComponent from "@/components/webrct/viewer_v2";
 import { useRoute } from "@react-navigation/native";
-import { StatusBar } from "expo-status-bar";
 
 
 
@@ -15,12 +14,11 @@ const wsUrl = 'ws://webrtc.qq-kan.com/';
 
 export default function ViewerScreen() {
 
+  // 获取params
+  const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
 
   return (
-    <>
-      <StatusBar hidden={true} />
-      <TestComponent wsurl={wsUrl} />
-    </>
+    <TestComponent wsurl={wsUrl} />
   );
 }
 
