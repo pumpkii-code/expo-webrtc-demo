@@ -59,7 +59,8 @@ export default function TestComponent({ wsurl }: { wsurl: string }) {
     console.log('[VIEWER] 开始连接信令服务器');
     signalingClientV2.current = new SignalingClientV2(serverUrl, newGuid());
 
-    const peerId = 'RHZL-00-WTSN-9S3D-00000727';
+    const peerId = 'RHZL-00-IFJF-779N-00000244';
+    // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
     const sessionId = newGuid();
     const source = 'MainStream';
     const audioEnable = 'recvonly';
