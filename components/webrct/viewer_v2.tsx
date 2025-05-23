@@ -1,21 +1,155 @@
 import { useEffect, useRef, useState } from "react"
-import { SignalingClientV2 } from '@/lib/signal_v2';
-import { newGuid } from "@/lib/util";
-import { View, Text, StyleSheet } from "react-native";
-import { RTCPeerConnection, RTCSessionDescription, RTCView, MediaStream, RTCIceCandidate } from 'react-native-webrtc';
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
 import type RTCTrackEvent from 'react-native-webrtc/lib/typescript/RTCTrackEvent.d.ts'
+import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
+import type RTCIceCandidateEvent from 'react-native-webrtc/lib/typescript/RTCIceCandidateEvent.d.ts'
+interface ITestComponentProps {
+  rtcConfig: RTCConfiguration;
+  sdp: string;
+  candidate: string;
+  onIcecandidate: (candidate: string) => void;
+  onCreateAnswer: (answer: { sdp: string; type: string }) => void;
+  // onCreateOffer: (offer: { sdp: string; type: string }) => void;
+}
 
-export default function TestComponent({ wsurl }: { wsurl: string }) {
-  const signalingClientV2 = useRef<SignalingClientV2 | null>(null);
+
+export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, onCreateAnswer,
+  // onCreateOffer
+}: ITestComponentProps) {
+  // const signalingClientV2 = useRef<SignalingClientV2 | null>(null);
   const webrtcClient = useRef<RTCPeerConnection | null>(null);
-  // const rtcDataChannel = useRef<RTCDataChannel | null>(null);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const videoStreamRef = useRef<MediaStream>(videoStream);
+  videoStreamRef.current = videoStream;
   const [rtcDataChannel, setRtcDataChannel] = useState<RTCDataChannel>();
   const [error, setError] = useState<string | null>(null);
-  const [connected, setConnected] = useState(false);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | undefined>('new');
+
+  const handleOnTrack = (e: RTCTrackEvent<"track">) => {
+    console.log('%c_____7.4___ 收到 track 事件', 'background-color: black; color: white', e.streams[0]);
+    const stream = e.streams[0];
+    setVideoStream(stream);
+  }
+
+  const handelDataChannel = (dataChannel: RTCDataChannelEvent<"datachannel">) => {
+    console.log('%c_____8 收到 datachannel 事件', 'background-color: black; color: white', dataChannel);
+    setRtcDataChannel(dataChannel.channel)
+  }
+
+  const handleIceCandidate = (event: RTCIceCandidateEvent<"icecandidate">) => {
+    console.log('%c___6 收到 icecandidate 事件', 'color:lightblue', event, event.candidate);
+    if (event.candidate) {
+      const candidate = JSON.stringify(event.candidate);
+      onIcecandidate(candidate)
+    }
+  }
+
+  const handleConnectionStateChange = () => {
+    console.log('%c_____7.5____ 收到 connectionstatechange 事件', 'background-color: black; color: yellow');
+    const newState = webrtcClient.current?.connectionState;
+    console.log(`Connection state changed: ${newState}`);
+    setConnectionState(newState);
+    if (newState === 'failed') {
+      setError(`WebRTC connection failed.`);
+      // 可以在这里触发重连逻辑，或者让使用方处理
+      // cleanupWebRTC(); // 如果连接失败，清理资源
+    } else if (newState === 'disconnected') {
+      console.warn(`WebRTC connection disconnected. May recover or may need reconnection.`);
+      // 'disconnected' 状态有时可以自动恢复，但如果长时间停留，也视为失败
+    } else if (newState === 'closed') {
+      console.log(`WebRTC connection closed.`);
+      // cleanupWebRTC(); // 确保资源在关闭时被清理
+    } else {
+      setError(null); // 清除旧的错误
+    }
+  }
+
+  const handleIceconnectionstatechange = () => {
+    console.log('%c_____7.1___ 收到 iceconnectionstatechange 事件',
+      'background-color: aqua; color: white',
+      webrtcClient.current?.connectionState
+    );
+  }
+
+  const handleIcegatheringstatechange = () => {
+    console.log('%c_____7.2___ 收到 icegatheringstatechange 事件', 'background-color: black; color: white');
+  }
+
+  const handleSignalingstatechange = () => {
+    console.log('%c_____7.3___ 收到 signalingstatechange 事件', 'background-color: black; color: white');
+  }
+
+  const initWebrtcClient = async (iceservers: RTCConfiguration) => {
+    webrtcClient.current = new RTCPeerConnection({
+      iceServers: iceservers.iceServers,
+    });
+    try {
+      webrtcClient.current?.addEventListener('track', handleOnTrack);
+      webrtcClient.current?.addEventListener('datachannel', handelDataChannel);
+      webrtcClient.current?.addEventListener('icecandidate', handleIceCandidate);
+      webrtcClient.current?.addEventListener('signalingstatechange', handleSignalingstatechange);
+      webrtcClient.current?.addEventListener('connectionstatechange', handleConnectionStateChange);
+      webrtcClient.current?.addEventListener('icegatheringstatechange', handleIcegatheringstatechange);
+      webrtcClient.current?.addEventListener('iceconnectionstatechange', handleIceconnectionstatechange);
+
+    } catch (error) {
+      setError(` Failed to initialize WebRTC)`);
+      console.error('Failed to initialize WebRTC', error);
+      setConnectionState('closed'); // 更新状态
+      return false;
+    }
+  }
+
+  const initWebrtcClientAsync = async () => {
+    await webrtcClient.current?.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: sdp }));
+
+    await webrtcClient.current?.createAnswer().then((answer) => {
+      console.log('___5 创建 answer');
+      webrtcClient.current?.setLocalDescription(answer);
+      onCreateAnswer(answer);
+    });
+
+    console.log('_____A1___ 初始化 webrtcClient', webrtcClient.current?.connectionState);
+    setConnectionState(webrtcClient.current?.connectionState); // 初始化状态
+
+    // await webrtcClient.current?.createOffer({}).then((offer) => {
+    //   console.log('___5 创建 offer');
+    //   // signalingClientV2.current?.sendAnswer(offer.sdp, offer.type, peerId, sessionId);
+    //   onCreateOffer(offer);
+    //   return webrtcClient.current?.setLocalDescription(offer);
+    // });
+  }
+
+  useEffect(() => {
+    if (!candidate) return;
+    webrtcClient.current?.addIceCandidate(JSON.parse(candidate));
+  }, [candidate])
+
+  useEffect(() => {
+    setError(null);
+    initWebrtcClient(rtcConfig);
+    initWebrtcClientAsync();
+
+    return () => {
+      if (webrtcClient.current) {
+        webrtcClient.current.removeEventListener('track', handleOnTrack);
+        webrtcClient.current.removeEventListener('datachannel', handelDataChannel);
+        webrtcClient.current.removeEventListener('icecandidate', handleIceCandidate);
+        webrtcClient.current.removeEventListener('signalingstatechange', handleSignalingstatechange);
+        webrtcClient.current.removeEventListener('connectionstatechange', handleConnectionStateChange);
+        webrtcClient.current.removeEventListener('icegatheringstatechange', handleIcegatheringstatechange);
+        webrtcClient.current.removeEventListener('iceconnectionstatechange', handleIceconnectionstatechange);
+        webrtcClient.current.close();
+      }
+      if (videoStreamRef.current) {
+        videoStreamRef.current.release();
+      }
+    };
+
+  }, [rtcConfig])
 
 
   useEffect(() => {
@@ -49,201 +183,63 @@ export default function TestComponent({ wsurl }: { wsurl: string }) {
 
   }, [rtcDataChannel]);
 
-  const handleOnTrack = (e: RTCTrackEvent<"track">) => {
-    console.log('%c_____7.4___ 收到 track 事件', 'background-color: black; color: white', e.streams[0]);
-    const stream = e.streams[0];
-    setVideoStream(stream);
-  }
-
-  const connectSignaling = (serverUrl: string) => {
-    console.log('[VIEWER] 开始连接信令服务器');
-    signalingClientV2.current = new SignalingClientV2(serverUrl, newGuid());
-
-    const peerId = 'RHZL-00-WTSN-9S3D-00000727';
-    const sessionId = newGuid();
-    const source = 'MainStream';
-    const audioEnable = 'recvonly';
-    const videoEnable = 'recvonly';
-    const connectmode = 'live';
-    const user = 'root';
-    const pwd = '123456';
-    const datachannelEnable = true;
-
-    const initWebrtcClient = (iceservers: RTCConfiguration) => {
-      webrtcClient.current = new RTCPeerConnection({
-        iceServers: iceservers.iceServers,
-      });
-
-      try {
-        webrtcClient.current?.addEventListener('track', handleOnTrack);
-
-        webrtcClient.current?.addEventListener('datachannel', (ev) => {
-          console.log('%c_____8 收到 datachannel 事件', 'background-color: black; color: white', ev);
-          setRtcDataChannel(ev.channel)
-        });
-
-        webrtcClient.current?.addEventListener('icecandidate', (event) => {
-          console.log('%c___6 收到 icecandidate 事件', 'color:lightblue', event, event.candidate);
-          if (event.candidate) {
-            const candidate = JSON.stringify(event.candidate);
-            signalingClientV2.current?.sendIceCandidate(candidate, peerId, sessionId);
-          }
-        });
-
-        webrtcClient.current?.addEventListener('connectionstatechange', (event) => {
-          console.log('%c_____7.5____ 收到 connectionstatechange 事件', 'background-color: black; color: yellow', event);
-          const newState = webrtcClient.current?.connectionState;
-          console.log(`Connection state changed: ${newState}`);
-          setConnectionState(newState);
-          if (newState === 'failed') {
-            setError(`WebRTC connection failed.`);
-            // 可以在这里触发重连逻辑，或者让使用方处理
-            // cleanupWebRTC(); // 如果连接失败，清理资源
-          } else if (newState === 'disconnected') {
-            console.warn(`WebRTC connection disconnected. May recover or may need reconnection.`);
-            // 'disconnected' 状态有时可以自动恢复，但如果长时间停留，也视为失败
-          } else if (newState === 'closed') {
-            console.log(`WebRTC connection closed.`);
-            // cleanupWebRTC(); // 确保资源在关闭时被清理
-          } else {
-            setError(null); // 清除旧的错误
-          }
-        });
-
-        webrtcClient.current?.addEventListener('iceconnectionstatechange', (event) => {
-          console.log('%c_____7.1___ 收到 iceconnectionstatechange 事件',
-            'background-color: aqua; color: white',
-            webrtcClient.current?.connectionState
-          );
-        });
-
-        webrtcClient.current?.addEventListener('icegatheringstatechange', (event) => {
-          console.log('%c_____7.2___ 收到 icegatheringstatechange 事件', 'background-color: black; color: white', event);
-        });
-
-        webrtcClient.current?.addEventListener('signalingstatechange', (event) => {
-          console.log('%c_____7.3___ 收到 signalingstatechange 事件', 'background-color: black; color: white', event);
-        });
-
-      } catch (error) {
-        setError(` Failed to initialize WebRTC)`);
-        console.error('Failed to initialize WebRTC', error);
-        setConnectionState('closed'); // 更新状态
-        return false;
-      }
+  const getStatusMessage = () => {
+    if (error && connectionState === 'connected') {
+      return <Text style={styles.error}>{error}</Text>;
     }
-
-    signalingClientV2.current?.connect({
-      onConnected: () => {
-        setConnected(true);
-        setError(null);
-        signalingClientV2.current?.initiateSession(peerId, sessionId);
-      },
-      onCreate: (data) => {
-        console.log('___3 收到 onCreate 事件', data);
-        const options = {
-          audioEnable,
-          videoEnable,
-          iceServers: data.iceServers,
-          user,
-          pwd,
-          datachannelEnable
-        };
-        signalingClientV2.current?.sendCall(peerId, sessionId, connectmode, source, options);
-      },
-      onOffer: async (data) => {
-        const iceservers = JSON.parse(data.iceservers) as RTCConfiguration;
-        console.log('___4__ 收到 onOffer 事件', data);
-        initWebrtcClient(iceservers);
-
-        await webrtcClient.current?.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
-
-        await webrtcClient.current?.createAnswer().then((answer) => {
-          console.log('___5 创建 answer');
-          webrtcClient.current?.setLocalDescription(answer);
-          signalingClientV2.current?.sendAnswer(answer.sdp, answer.type, peerId, sessionId);
-        });
-
-        console.log('_____A1___ 初始化 webrtcClient', webrtcClient.current?.connectionState);
-        setConnectionState(webrtcClient.current?.connectionState); // 初始化状态
-
-        // await webrtcClient.current.createOffer({}).then((offer) => {
-        //   console.log('___5 创建 offer');
-        //   signalingClientV2.current?.sendAnswer(offer.sdp, offer.type, peerId, sessionId);
-        //   return webrtcClient.current?.setLocalDescription(offer);
-        // })
-      },
-      onCandidate: (data) => {
-        console.log('___1000_1 收到 onCandidate 事件', data);
-        const newData = JSON.parse(data.candidate);
-        const candidate = new RTCIceCandidate({
-          sdpMLineIndex: newData.sdpMLineIndex,
-          candidate: newData.candidate,
-        });
-        webrtcClient.current?.addIceCandidate(JSON.parse(data.candidate));
-      },
-      onDisconnected: () => {
-        setConnected(false);
-      }
-    })
-  }
-
-  useEffect(() => {
-    connectSignaling(wsurl);
-
-    return () => {
-      if (signalingClientV2.current) {
-        signalingClientV2.current.disconnect();
-      }
-
-      if (webrtcClient.current) {
-        webrtcClient.current.close();
-      }
-    };
-  }, [])
-
-  return (
-    <View style={styles.container}>
-      {/* <Text>正在播放....{"connectionState: " + connectionState} </Text> */}
-      {error && (connectionState === 'connected') && (
-        <Text style={styles.error}>{error}</Text>
-      )}
-      {!connected && !error && (
-        <Text style={styles.offlineText}>正在连接服务器...</Text>
-      )}
-      {connectionState === 'disconnected' && (
-        <Text style={styles.offlineText}>设备断开连接</Text>
-      )}
-
-      {connected && !videoStream && !error && (
-        <Text>等待主播端开始推流...</Text>
-      )}
-      {videoStream
-        // && connectionState === 'connected' 
-        && (
-          <>
-            <RTCView
-              streamURL={videoStream.toURL()}
-              style={styles.stream}
-              objectFit="contain"
-            />
-          </>
-        )
-      }
-      {!videoStream && (
+    if (connectionState === 'disconnected') {
+      return <Text style={styles.offlineText}>WebRTC 连接已断开</Text>;
+    }
+    if (connectionState === 'connecting' || connectionState === 'new') {
+      return <Text style={styles.offlineText}>正在建立 WebRTC 连接...</Text>;
+    }
+    if (!videoStream && !error && connectionState === 'connected') {
+      return <Text style={styles.offlineText}>等待主播开始推流...</Text>;
+    }
+    if (!videoStream) {
+      return (
         <View style={styles.offlineContainer}>
-          <Text style={styles.offlineText}>设备还未连接</Text>
+          <Text style={styles.offlineText}>设备未连接</Text>
         </View>
-      )}
-    </View>
-  );
+      );
+    }
+    return null;
+  };
+
+  // 完全准备完毕
+  if (videoStream && connectionState === 'connected' && !error) {
+    return (
+      <RTCView
+        streamURL={videoStream.toURL()}
+        style={styles.stream}
+        objectFit="contain"
+      />
+    );
+  } else {
+    return (
+      <>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.loadingText}>
+            {getStatusMessage()}
+          </Text>
+        </View>
+      </>
+    )
+  }
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loadingContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'black'
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#999'
   },
   stream: {
     flex: 1,

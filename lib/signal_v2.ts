@@ -68,8 +68,8 @@ export interface SignalingCallbacks {
 
 export interface CallOptions {
   datachannelEnable?: boolean;
-  audioEnable?: string;
-  videoEnable?: string;
+  audioEnable?: 'recvonly';
+  videoEnable?: 'recvonly';
   user?: string;
   pwd?: string;
   iceServers?: string;
@@ -116,8 +116,9 @@ export class SignalingClientV2 {
   private _sendMessage(payload: SignalPostMessage) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log(
-        '%c______sendmessage......... XD..',
+        '%c______sendmessage......... XD...:  ' + payload.eventName,
         'background-color:green;color:aqua',
+
         payload
       );
       const messageStr = JSON.stringify(payload);
@@ -190,8 +191,9 @@ export class SignalingClientV2 {
     try {
       const message = JSON.parse(event.data as string) as SignalReceverMessage;
       console.log(
-        `%c__[SignalingClient] Received (${this.meid}):` + message.eventName,
-        'background-color:aqua;'
+        `%c__收到websocket 事件_____ :` + message.eventName,
+        'background-color:aqua;',
+        message
       );
       switch (message.eventName) {
         case '_create':
@@ -273,23 +275,29 @@ export class SignalingClientV2 {
     peerId: string,
     sessionId: string,
     mode: 'live' | 'play',
-    source: string, // MainStream, SubStream, or filename
+    source: 'MainStream', // MainStream, SubStream, or filename
     options: CallOptions = {}
   ) {
-    const callData: any = {
+    const datachannel = options.datachannelEnable ? 'true' : 'false';
+    const callData = {
       mode: mode,
       source: source,
-      datachannel: options.datachannelEnable?.toString() ?? 'false',
-      audio: options.audioEnable,
-      video: options.videoEnable, // Usually true for video calls
-    };
-    if (options.user) callData.user = options.user;
-    if (options.pwd) callData.pwd = options.pwd;
-    if (options.iceServers) {
-      // The PDF states: "iceservers": JSON.stringify(configuration)
-      // Assuming `configuration` means the ICE servers array.
-      callData.iceservers = options.iceServers;
-    }
+      datachannel: datachannel,
+      audio: options.audioEnable ?? 'recvonly',
+      video: options.videoEnable ?? 'recvonly',
+      ...{
+        user: options.user ?? '',
+        pwd: options.pwd ?? '',
+        iceservers: options.iceServers ?? '',
+      }, // Usually true for video calls
+    } as const;
+    // if (options.user) callData.user = options.user;
+    // if (options.pwd) callData.pwd = options.pwd;
+    // if (options.iceServers) {
+    //   // The PDF states: "iceservers": JSON.stringify(configuration)
+    //   // Assuming `configuration` means the ICE servers array.
+    //   callData.iceservers = options.iceServers;
+    // }
 
     const message: SignalPostMessage = {
       eventName: '__call',

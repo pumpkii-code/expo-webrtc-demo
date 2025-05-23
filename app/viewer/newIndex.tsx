@@ -6,85 +6,63 @@
  * @FilePath: /expo-webrtc-demo/app/viewer/index.tsx
  */
 import PDRTCView from "@/components/webrct/viewer_v2";
-import { useRoute } from "@react-navigation/native";
 import { useEffect, useRef, useState } from "react"
 import { SignalingClientV2 } from '@/lib/signal_v2';
 import { newGuid } from "@/lib/util";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
-
+import { SignalingClient } from "@/lib/signal";
+import { useRoute } from "@react-navigation/native";
+import { RTCIceCandidate } from 'react-native-webrtc';
 
 // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
-const peerId = 'RHZL-00-IFJF-779N-00000244';
-const wsUrl = 'ws://webrtc.qq-kan.com/';
+const viewId = '2222'
 
 export default function ViewerScreen() {
-  // const [peerId, setUsePeerId] = useState<string>('');
-  const signalingClientV2 = useRef<SignalingClientV2 | null>(null);
+  const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
+  const webSocketRef = useRef<SignalingClient | null>(null);
   const [connected, setConnected] = useState(false);
-  // const webrtcClient = useRef<RTCPeerConnection | null>(null);
-  const sessionIdRef = useRef(newGuid());
   const [sdp, setSdp] = useState<string>('');
   const [candidate, setCandidate] = useState<string>('');
-
-  // const [isOfferReady,setiIsOfferReady] = useState(false);
   const [rtcConfig, setRtcConfig] = useState<RTCConfiguration>();
 
+
+  // 连接信令服务器
   const connectSignaling = (serverUrl: string) => {
     console.log('[VIEWER] 开始连接信令服务器');
-    signalingClientV2.current = new SignalingClientV2(serverUrl, newGuid());
+    console.log('%c___' + serverUrl, 'color:aqua')
+    webSocketRef.current = new SignalingClient(serverUrl);
 
-    // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
-    const source = 'MainStream';
-    const audioEnable = 'recvonly';
-    const videoEnable = 'recvonly';
-    const connectmode = 'live';
-    const user = 'root';
-    const pwd = '123456';
-    const datachannelEnable = true;
-
-    signalingClientV2.current?.connect({
+    webSocketRef.current.connect({
       onConnected: () => {
         setConnected(true);
-        signalingClientV2.current?.initiateSession(peerId, sessionIdRef.current);
+        console.log('[VIEWER] 连接信令服务器成功');
+        webSocketRef.current?.register(viewId);
       },
-      onCreate: (data) => {
-        const options = {
-          audioEnable,
-          videoEnable,
-          iceServers: data.iceServers,
-          user,
-          pwd,
-          datachannelEnable
-        } as const;
-        signalingClientV2.current?.sendCall(peerId, sessionIdRef.current, connectmode, source, options);
-      },
-      onOffer: async (data) => {
-        const iceservers = JSON.parse(data.iceservers) as RTCConfiguration;
-        // initWebrtcClient(iceservers);
-
-        setRtcConfig(iceservers);
-        setSdp(data.sdp);
-      },
-      onCandidate: (data) => {
-        console.log('___1000_1 收到 onCandidate 事件', data);
-        setCandidate(data.candidate);
+      onRegistered: () => {
+        console.log('[VIEWER] 注册成功');
+        console.log('_____peerid', peerId, viewId)
+        webSocketRef.current?.connectTo(peerId, viewId);
       },
       onDisconnected: () => {
         setConnected(false);
+      },
+      onOffer: (description) => {
+        // 任务 4  WebRTC iceservers 传递优化
+        const iceservers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        setRtcConfig(iceservers);
+        setSdp(description.sdp);
+      },
+      onCandidate: (candidate) => {
+        setCandidate(JSON.stringify(candidate));
       }
     });
-  }
+  };
 
   useEffect(() => {
-
-  }, []);
-
-
-  useEffect(() => {
-    connectSignaling(wsUrl);
+    connectSignaling('ws://192.168.3.65:8080');
     return () => {
-      if (signalingClientV2.current) {
-        signalingClientV2.current.disconnect();
+      if (webSocketRef.current) {
+        webSocketRef.current.disconnect();
       }
     };
   }, [])
@@ -107,13 +85,14 @@ export default function ViewerScreen() {
     <View style={styles.container}>
       <PDRTCView
         onIcecandidate={(candidate) => {
-          signalingClientV2.current?.sendIceCandidate(candidate, peerId, sessionIdRef.current);
+          const newCandidate = JSON.parse(candidate) as RTCIceCandidate;
+          webSocketRef.current?.sendCandidate(newCandidate, peerId);
         }}
         onCreateAnswer={(answer) => {
-          signalingClientV2.current?.sendAnswer(answer.sdp, answer.type, peerId, sessionIdRef.current);
+          webSocketRef.current?.sendAnswer(answer.sdp, peerId);
         }}
         // onCreateOffer={(offer) => {
-        //   signalingClientV2.current?.sendOffer(offer.sdp, offer.type, peerId, sessionIdRef.current);
+        //   webSocketRef.current?.sendOffer(offer.sdp, offer.type, peerId, sessionIdRef.current);
         // }}
         candidate={candidate}
         rtcConfig={rtcConfig}

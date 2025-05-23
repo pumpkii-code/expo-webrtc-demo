@@ -46,6 +46,16 @@ export default function RouteScreen() {
 
       <Link
         href={{
+          pathname: '/viewer/newIndex',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        查看直播间(newIndex)
+      </Link>
+
+      <Link
+        href={{
           pathname: '/master',
           params: { serno }
         }}

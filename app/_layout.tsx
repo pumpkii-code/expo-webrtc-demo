@@ -79,6 +79,14 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
+          name="viewer/newIndex"
+          options={{
+            headerShown: false,
+            orientation: 'landscape',  // 添加这行来强制横屏
+            animation: 'none'
+          }}
+        />
+        <Stack.Screen
           name="master/index"
           options={{
             headerShown: false,
