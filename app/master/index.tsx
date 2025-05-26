@@ -106,7 +106,7 @@ export default function MasterScreen() {
       await peerConnection.setLocalDescription(offer);
 
       if (signalingClient.current) {
-        signalingClient.current.sendOffer(offer.sdp, viewerId);
+        signalingClient.current.sendOffer(offer.sdp, viewerId, '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}');
       }
     } catch (err) {
       console.error(`[MASTER] 为观众 ${viewerId} 创建 offer 失败:`, err);

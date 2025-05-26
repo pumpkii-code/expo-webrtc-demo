@@ -47,8 +47,10 @@ export default function ViewerScreen() {
         setConnected(false);
       },
       onOffer: (description) => {
+        console.log('%c______onOffer_____________123', 'background-color:yellow;color:aqua', description);
         // 任务 4  WebRTC iceservers 传递优化
-        const iceservers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        const iceservers = JSON.parse(description.iceservers) as RTCConfiguration;
+        // const iceservers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
         setRtcConfig(iceservers);
         setSdp(description.sdp);
       },

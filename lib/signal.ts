@@ -1,46 +1,9 @@
+import {
+  OfferReceverData,
+  SignalingMessage,
+  SignalingCallbacks,
+} from '@/components/type/signal';
 import { RTCIceCandidate, RTCSessionDescription } from 'react-native-webrtc';
-
-export type SignalingMessage =
-  | {
-      eventName: '__offer' | '__answer';
-      data: {
-        to: string;
-        from: string;
-        sdp?: string;
-      };
-    }
-  | {
-      eventName: '__register' | '__registered';
-      data: {
-        peerId: string;
-      };
-    }
-  | {
-      eventName: '__connectto' | '__incoming_connection';
-      data: {
-        to: string;
-        from: string;
-      };
-    }
-  | {
-      eventName: '__candidate';
-      data: {
-        from: string;
-        candidate?: RTCIceCandidate;
-        to: string;
-      };
-    };
-
-type SignalingCallbacks = {
-  onConnected?: () => void;
-  onDisconnected?: () => void;
-  onError?: (error: string) => void;
-  onRegistered?: () => void; // 添加注册成功的回调
-  onOffer?: (description: RTCSessionDescription) => void;
-  onAnswer?: (description: RTCSessionDescription, from: string) => void;
-  onCandidate?: (candidate: RTCIceCandidate, from: string) => void;
-  onIncomingConnection?: (data: { from?: string; to?: string }) => void;
-};
 
 export class SignalingClient {
   private ws: WebSocket | null = null;
@@ -93,12 +56,13 @@ export class SignalingClient {
 
         case '__offer':
           if (data.sdp) {
-            this.callbacks.onOffer?.(
-              new RTCSessionDescription({
-                type: 'offer',
-                sdp: data.sdp,
-              })
-            );
+            console.log('%c____00010000___offer', data);
+            this.callbacks.onOffer?.({
+              type: 'offer',
+              sdp: data.sdp,
+              iceservers: data.iceservers, // 服务器端
+              iceservers2: data.iceservers2, // 设备端
+            });
           }
           break;
 
@@ -152,12 +116,15 @@ export class SignalingClient {
     }
   }
 
-  sendOffer(sdp: string, to: string) {
+  sendOffer(sdp: string, to: string, iceservers: string) {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      console.log('_____sendoffer______', {
+        data: { sdp, to, iceservers2: iceservers },
+      });
       this.ws.send(
         JSON.stringify({
           eventName: '__offer',
-          data: { sdp, to },
+          data: { sdp, to, iceservers2: iceservers },
         })
       );
     }

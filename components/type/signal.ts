@@ -1,3 +1,4 @@
+import { RTCIceCandidate, RTCSessionDescription } from 'react-native-webrtc';
 export interface BaseMessageData {
   sessionId: string;
   sessionType: 'IE';
@@ -5,7 +6,10 @@ export interface BaseMessageData {
 }
 
 export interface OfferReceverData {
-  iceservers: string;
+  iceservers: string; // 来自服务器
+  iceservers2?: string; // 来自 设备端
+  sdp: string;
+  type: 'offer';
 }
 
 export type SignalingMessage =
@@ -15,6 +19,8 @@ export type SignalingMessage =
         to: string;
         from: string;
         sdp?: string;
+        iceservers: string;
+        iceservers2?: string;
       };
     }
   | {
@@ -44,7 +50,7 @@ export type SignalingCallbacks = {
   onDisconnected?: () => void;
   onError?: (error: string) => void;
   onRegistered?: () => void; // 添加注册成功的回调
-  onOffer?: (description: RTCSessionDescription) => void;
+  onOffer?: (data: OfferReceverData) => void;
   onAnswer?: (description: RTCSessionDescription, from: string) => void;
   onCandidate?: (candidate: RTCIceCandidate, from: string) => void;
   onIncomingConnection?: (data: { from?: string; to?: string }) => void;
