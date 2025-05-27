@@ -5,12 +5,15 @@ import {
   MediaStream,
   RTCView,
   mediaDevices,
+  RTCSessionDescription
 } from 'react-native-webrtc';
 import { Text, View } from '@/components/Themed';
 import { SignalingClient } from '@/lib/signal';
 import { useRoute } from '@react-navigation/native';
+import { SignalingClientV2 } from '@/lib/signal_v2';
+import { newGuid } from '@/lib/util';
 
-const wsUrl = 'ws://192.168.3.65:5678';
+const wsUrl = 'ws://192.168.3.65:8910';
 
 export default function MasterScreen() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -19,10 +22,11 @@ export default function MasterScreen() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
+  const sessionIdRef = useRef<string | null>(null);
 
   // 使用 Map 存储每个观众的连接
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const signalingClient = useRef<SignalingClient | null>(null);
+  const signalingClientV2 = useRef<SignalingClientV2 | null>(null);
 
   // 初始化摄像头
   const setupCamera = async () => {
@@ -59,10 +63,9 @@ export default function MasterScreen() {
 
       // 处理 ICE candidate
       peerConnection.addEventListener('icecandidate', (event) => {
-        console.log('%c____device_ice_candidate___', 'background: aqua', event);
-        if (event.candidate) {
-          console.log(`[MASTER] 发送 ICE candidate 到观众 ${viewerId}:`, event.candidate);
-          signalingClient.current?.sendCandidate(event.candidate, viewerId);
+        if (event.candidate && sessionIdRef.current) {
+          console.log(`[MASTER] 发送 ICE candidate 到观众 ${viewerId}:`, event);
+          signalingClientV2.current?.deviceSendIceCandidate(JSON.stringify(event.candidate), viewerId, sessionIdRef.current);
         } else {
           console.log(`[MASTER] 观众 ${viewerId} 的 ICE candidate 收集完成`);
         }
@@ -106,8 +109,14 @@ export default function MasterScreen() {
       });
       await peerConnection.setLocalDescription(offer);
 
-      if (signalingClient.current) {
-        signalingClient.current.sendOffer(offer.sdp, viewerId, '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}');
+      if (signalingClientV2.current && sessionIdRef.current) {
+        const sendData = {
+          sdp: offer.sdp,
+          peerId: viewerId,
+          sessionId: sessionIdRef.current,
+          state: 'successed'
+        }
+        signalingClientV2.current.sendOffer(sendData);
       }
     } catch (err) {
       console.error(`[MASTER] 为观众 ${viewerId} 创建 offer 失败:`, err);
@@ -118,44 +127,36 @@ export default function MasterScreen() {
   // 连接信令服务器
   const connectSignaling = (serverUrl: string, stream: MediaStream) => {
     console.log('开始连接信令服务器');
-    signalingClient.current = new SignalingClient(serverUrl);
+    signalingClientV2.current = new SignalingClientV2(serverUrl, newGuid());
 
-    signalingClient.current.connect({
+    signalingClientV2.current.connect({
       onConnected: () => {
         setConnected(true);
-        setError(null);
-        signalingClient.current?.register(peerId);
+        console.log('连接信令服务器成功');
+        signalingClientV2.current?.registerDevice(peerId);
       },
-      onIncomingConnection: (data) => {
-        console.log('收到观众端连接请求:', data);
-        if (data.from) {
-          createAndSendOffer(data.from, stream);
+
+      onCall: (data) => {
+        console.log('收到呼叫');
+        sessionIdRef.current = data.sessionId;
+        createAndSendOffer(data.from, stream);
+      },
+
+      onAnswer: (data) => {
+        console.log('%c____收到回答_____', 'background: yellow', data);
+        const peerConnection = peerConnections.current.get(data.from);
+        if (peerConnection) {
+          peerConnection.setRemoteDescription(new RTCSessionDescription({
+            sdp: data.sdp,
+            type: data.type as RTCSdpType,
+          }));
         }
       },
-      onDisconnected: () => {
-        setConnected(false);
-        // 清理所有连接
-        peerConnections.current.forEach(pc => pc.close());
-        peerConnections.current.clear();
-      },
-      onError: (errorMessage) => {
-        setError(errorMessage);
-      },
-      onAnswer: async (description, from) => {
-        const peerConnection = peerConnections.current.get(from);
-        if (!peerConnection) {
-          console.error(`[MASTER] 未找到观众 ${from} 的连接`);
-          return;
-        }
-        try {
-          console.log('%c___________1___setRemoteDescription__', ' background:red', description)
-          await peerConnection.setRemoteDescription(description);
-        } catch (err) {
-          console.error(`[MASTER] 设置观众 ${from} 的远程描述时出错:`, err);
-          peerConnections.current.delete(from);
-        }
-      },
-      onCandidate: async (candidate, from) => {
+
+      onClientIceCandidate: async (data) => {
+        const { from } = data;
+        const candidate = JSON.parse(data.candidate); // 解析 ICE candidate
+        console.log('收到 ICE candidate', data);
         const peerConnection = peerConnections.current.get(from);
         if (!peerConnection) {
           console.error(`[MASTER] 未找到观众 ${from} 的连接`);
@@ -163,10 +164,11 @@ export default function MasterScreen() {
         }
         try {
           await peerConnection.addIceCandidate(candidate);
+          console.log(`[MASTER] 添加观众 ${from} 的 ICE candidate 成功 :D ____`); // 打印到 cons
         } catch (err) {
           console.error(`[MASTER] 添加观众 ${from} 的 ICE candidate 失败:`, err);
         }
-      }
+      },
     });
   };
 
@@ -197,9 +199,9 @@ export default function MasterScreen() {
         pc.getSenders().forEach(sender => sender.track?.stop());
       });
       peerConnections.current.clear();
-      if (signalingClient.current) {
-        signalingClient.current.disconnect();
-        signalingClient.current = null;
+      if (signalingClientV2.current) {
+        signalingClientV2.current.disconnect();
+        signalingClientV2.current = null;
       }
     };
     startBroadcasting();

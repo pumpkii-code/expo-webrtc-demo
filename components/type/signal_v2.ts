@@ -19,7 +19,7 @@ export interface CallPostData {
 
 export interface AnswerPostData {
   sdp: string;
-  type: string;
+  type: RTCSdpType;
 }
 
 export interface IceServer {
@@ -76,9 +76,9 @@ export interface IceCandidateReceverData {
 export interface OfferReceverData {
   iceservers: string;
   state: 'successed';
-  user: string;
+  user?: string;
   sdp: string;
-  type: 'offer';
+  type: RTCSdpType;
 }
 
 export interface PingReceverData {}
@@ -116,4 +116,65 @@ export type SignalReceverMessage =
   | {
       eventName: '_disconnected';
       data: BaseMessageData & DiconnectedReceverMessage;
+    }
+  | {
+      eventName: '_register';
+      data: {
+        peerId: string;
+      };
+    }
+  | {
+      eventName: '__ice_candidate';
+      data: BaseMessageData & IcePostData;
     };
+
+export interface SignalingCallbacks {
+  onConnected?: () => void;
+  onDisconnected?: (reason?: string) => void;
+  onError?: (error: Event | string) => void;
+
+  // Called when the server acknowledges _connectto and provides ICE servers
+  // This happens in both "Device Initiates Offer" and "Browser Initiates Offer" flows,
+  // sent to the party that initiated the _connectto.
+  onCreate?: (data: BaseMessageData & CreateReceverData) => void;
+  onOffer?: (data: BaseMessageData & OfferReceverData) => void;
+  onAnswer?: (data: BaseMessageData & AnswerPostData) => void;
+  onDeviceIceCandidate?: (
+    data: BaseMessageData & IceCandidateReceverData
+  ) => void;
+  onCall?: (data: BaseMessageData & CallPostData) => void;
+  onClientIceCandidate?: (data: BaseMessageData & IcePostData) => void;
+
+  // Browser to Device message (as per PDF pg 8)
+  onPostMessage?: (message: any, from: string, sessionId: string) => void;
+  // Response to a _post_message sent by this client
+  onPostMessageResponse?: (
+    message: any,
+    result: any,
+    from: string,
+    sessionId: string
+  ) => void;
+
+  // When the peer actively disconnects the session (PDF pg 10, device initiated _session_disconnected)
+  onSessionDisconnected?: (
+    message: string | undefined,
+    from: string,
+    sessionId: string
+  ) => void;
+  // When the peer actively disconnects using _disconnected (PDF pg 11, browser initiated)
+  // This is likely received by the *other* party after one party sends _disconnected
+  onPeerDisconnected?: (
+    from: string,
+    sessionId: string,
+    message?: string
+  ) => void;
+}
+
+export interface CallOptions {
+  datachannelEnable?: boolean;
+  audioEnable?: 'recvonly';
+  videoEnable?: 'recvonly';
+  user?: string;
+  pwd?: string;
+  iceServers?: string;
+}

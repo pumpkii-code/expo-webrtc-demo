@@ -1,11 +1,9 @@
 import type {
   BaseMessageData,
+  CallOptions,
   SignalPostMessage,
   SignalReceverMessage,
-  IceServer,
-  CreateReceverData,
-  OfferReceverData,
-  IceCandidateReceverData,
+  SignalingCallbacks,
 } from '@/components/type/signal_v2';
 import { newGuid } from './util';
 
@@ -27,53 +25,6 @@ import { newGuid } from './util';
 const coverIceServers = (config: string): RTCConfiguration => {
   return JSON.parse(config);
 };
-
-export interface SignalingCallbacks {
-  onConnected?: () => void;
-  onDisconnected?: (reason?: string) => void;
-  onError?: (error: Event | string) => void;
-
-  // Called when the server acknowledges _connectto and provides ICE servers
-  // This happens in both "Device Initiates Offer" and "Browser Initiates Offer" flows,
-  // sent to the party that initiated the _connectto.
-  onCreate?: (data: BaseMessageData & CreateReceverData) => void;
-  onOffer?: (data: BaseMessageData & OfferReceverData) => void;
-  onAnswer?: (data: BaseMessageData) => void;
-  onCandidate?: (data: BaseMessageData & IceCandidateReceverData) => void;
-
-  // Browser to Device message (as per PDF pg 8)
-  onPostMessage?: (message: any, from: string, sessionId: string) => void;
-  // Response to a _post_message sent by this client
-  onPostMessageResponse?: (
-    message: any,
-    result: any,
-    from: string,
-    sessionId: string
-  ) => void;
-
-  // When the peer actively disconnects the session (PDF pg 10, device initiated _session_disconnected)
-  onSessionDisconnected?: (
-    message: string | undefined,
-    from: string,
-    sessionId: string
-  ) => void;
-  // When the peer actively disconnects using _disconnected (PDF pg 11, browser initiated)
-  // This is likely received by the *other* party after one party sends _disconnected
-  onPeerDisconnected?: (
-    from: string,
-    sessionId: string,
-    message?: string
-  ) => void;
-}
-
-export interface CallOptions {
-  datachannelEnable?: boolean;
-  audioEnable?: 'recvonly';
-  videoEnable?: 'recvonly';
-  user?: string;
-  pwd?: string;
-  iceServers?: string;
-}
 
 export class SignalingClientV2 {
   private ws: WebSocket | null = null;
@@ -113,7 +64,7 @@ export class SignalingClientV2 {
     };
   }
 
-  private _sendMessage(payload: SignalPostMessage) {
+  private _sendMessage(payload: SignalPostMessage | SignalReceverMessage) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log(
         '%c______sendmessage......... XD...:  ' + payload.eventName,
@@ -189,13 +140,24 @@ export class SignalingClientV2 {
 
   private _handleMessage(event: MessageEvent) {
     try {
-      const message = JSON.parse(event.data as string) as SignalReceverMessage;
+      const message = JSON.parse(event.data as string) as
+        | SignalReceverMessage
+        | SignalPostMessage;
       console.log(
         `%c__收到websocket 事件_____ :` + message.eventName,
         'background-color:aqua;',
         message
       );
       switch (message.eventName) {
+        // 下面这些全是 设备端 接收到的消息
+        case '__call':
+          this.callbacks.onCall?.(message.data);
+          break;
+
+        case '__answer':
+          this.callbacks.onAnswer?.(message.data);
+          break;
+        // 下面这些全是 客户端 接收到的消息
         case '_create':
           if (typeof message.data.iceServers !== 'string') {
             throw new Error('Invalid iceServers data type');
@@ -207,12 +169,18 @@ export class SignalingClientV2 {
             iceServers: JSON.stringify(iceServersData),
           });
           break;
+
         case '_offer':
           this.callbacks.onOffer?.(message.data);
           break;
+
         case '_ice_candidate':
           const data = message.data;
-          this.callbacks.onCandidate?.(data);
+          this.callbacks.onDeviceIceCandidate?.(data);
+          break;
+
+        case '__ice_candidate':
+          this.callbacks.onClientIceCandidate?.(message.data);
           break;
 
         case '_ping':
@@ -267,6 +235,15 @@ export class SignalingClientV2 {
     this._sendMessage(message);
   }
 
+  public registerDevice(peerId: string) {
+    const message: SignalReceverMessage = {
+      eventName: '_register',
+      data: { peerId },
+    };
+
+    this._sendMessage(message);
+  }
+
   /**
    * Sends a `_call` command, typically after receiving `_create`.
    * (Used in Device-Initiates-Offer flow, where Browser calls Device)
@@ -315,25 +292,30 @@ export class SignalingClientV2 {
    * (Used in Browser-Initiates-Offer flow)
    */
   public sendOffer(
-    sdp: string,
-    peerId: string,
-    sessionId: string,
-    state?: string /* for Alexa compatibility */
+    {
+      sdp,
+      peerId,
+      sessionId,
+      state,
+    }: {
+      sdp: string;
+      peerId: string;
+      sessionId: string;
+      state?: string;
+    } /* for Alexa compatibility */
   ) {
-    const offerData: any = {
-      sdp: sdp,
-      type: 'offer', // Type is explicitly "offer"
-    };
-    if (state) offerData.state = state;
-
-    const message: SignalPostMessage = {
-      eventName: '__offer',
+    const message: SignalReceverMessage = {
+      eventName: '_offer',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
-        ...offerData,
+        sdp: sdp,
+        type: 'offer', // Type is explicitly "offer"
+        state: 'successed',
+        iceservers: '',
       },
     };
+
     this._sendMessage(message);
   }
 
@@ -342,7 +324,7 @@ export class SignalingClientV2 {
    */
   public sendAnswer(
     sdp: string,
-    answerType: string,
+    answerType: RTCSdpType,
     peerId: string,
     sessionId: string
   ) {
@@ -365,13 +347,29 @@ export class SignalingClientV2 {
    * @param peerId The ID of the peer.
    * @param sessionId The current session ID.
    */
-  public sendIceCandidate(
+  public clientSendIceCandidate(
     candidateInfo: string,
     peerId: string,
     sessionId: string
   ) {
     const message: SignalPostMessage = {
       eventName: '__ice_candidate',
+      data: {
+        ...this._buildBaseMessageData(peerId, sessionId),
+        messageId: this._generateMessageId(),
+        candidate: candidateInfo,
+      },
+    };
+    this._sendMessage(message);
+  }
+
+  public deviceSendIceCandidate(
+    candidateInfo: string,
+    peerId: string,
+    sessionId: string
+  ) {
+    const message: SignalReceverMessage = {
+      eventName: '_ice_candidate',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),

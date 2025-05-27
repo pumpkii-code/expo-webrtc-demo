@@ -61,7 +61,7 @@ export default function ViewerScreen() {
   };
 
   useEffect(() => {
-    connectSignaling('ws://192.168.3.65:8080');
+    connectSignaling('ws://192.168.3.65:5678');
     return () => {
       if (webSocketRef.current) {
         webSocketRef.current.disconnect();

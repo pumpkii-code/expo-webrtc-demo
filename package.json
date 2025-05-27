@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "server": "nodemon ws.js",
+    "server2": "nodemon ws_old.js",
     "debug": "EXPO_DEBUG=true expo start --dev-client --clear"
   },
   "jest": {

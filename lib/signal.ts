@@ -80,6 +80,7 @@ export class SignalingClient {
 
         case '__candidate':
           if (data.candidate) {
+            console.log('收到候选者______:', data);
             this.callbacks.onCandidate?.(
               new RTCIceCandidate(data.candidate),
               data.from

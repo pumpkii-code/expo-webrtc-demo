@@ -63,6 +63,16 @@ export default function RouteScreen() {
       >
         我的直播间
       </Link>
+
+      <Link
+        href={{
+          pathname: '/master/m_v2',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        我的直播间(v2)
+      </Link>
     </SafeAreaView>
   );
 }

@@ -11,7 +11,7 @@ interface ITestComponentProps {
   sdp: string;
   candidate: string;
   onIcecandidate: (candidate: string) => void;
-  onCreateAnswer: (answer: { sdp: string; type: string }) => void;
+  onCreateAnswer: (answer: { sdp: string; type: RTCSdpType }) => void;
   // onCreateOffer: (offer: { sdp: string; type: string }) => void;
 }
 
@@ -104,6 +104,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
   }
 
   const initWebrtcClientAsync = async () => {
+    console.log('___initWebrtcClientAsync____', sdp)
     await webrtcClient.current?.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: sdp }));
 
     await webrtcClient.current?.createAnswer().then((answer) => {
@@ -125,6 +126,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
 
   useEffect(() => {
     if (!candidate) return;
+    console.log('_____A2___ 收到 addIceCandidate', candidate);
     webrtcClient.current?.addIceCandidate(JSON.parse(candidate));
   }, [candidate])
 

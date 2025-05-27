@@ -14,8 +14,10 @@ import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 
 
 // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
-const peerId = 'RHZL-00-IFJF-779N-00000244';
-const wsUrl = 'ws://webrtc.qq-kan.com/';
+// const peerId = 'RHZL-00-IFJF-779N-00000244';
+// const wsUrl = 'ws://webrtc.qq-kan.com/';
+const peerId = '111';
+const wsUrl = 'ws://192.168.3.65:8910/';
 
 export default function ViewerScreen() {
   // const [peerId, setUsePeerId] = useState<string>('');
@@ -59,13 +61,14 @@ export default function ViewerScreen() {
         signalingClientV2.current?.sendCall(peerId, sessionIdRef.current, connectmode, source, options);
       },
       onOffer: async (data) => {
+        console.log('%c_____onOffer____', 'background:yellow', data)
         const iceservers = JSON.parse(data.iceservers) as RTCConfiguration;
         // initWebrtcClient(iceservers);
 
         setRtcConfig(iceservers);
         setSdp(data.sdp);
       },
-      onCandidate: (data) => {
+      onDeviceIceCandidate: (data) => {
         console.log('___1000_1 收到 onCandidate 事件', data);
         setCandidate(data.candidate);
       },
@@ -107,7 +110,7 @@ export default function ViewerScreen() {
     <View style={styles.container}>
       <PDRTCView
         onIcecandidate={(candidate) => {
-          signalingClientV2.current?.sendIceCandidate(candidate, peerId, sessionIdRef.current);
+          signalingClientV2.current?.clientSendIceCandidate(candidate, peerId, sessionIdRef.current);
         }}
         onCreateAnswer={(answer) => {
           signalingClientV2.current?.sendAnswer(answer.sdp, answer.type, peerId, sessionIdRef.current);

@@ -183,6 +183,14 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    const sendData = formatMessage(eventName, data, ws);
+
+    if (eventName === '__connectto') {
+      userMap[from].send(JSON.stringify(sendData));
+    } else {
+      userMap[to].send(JSON.stringify(sendData));
+    }
+
     switch (eventName) {
       case '__connectto':
         // 存储用户信息
