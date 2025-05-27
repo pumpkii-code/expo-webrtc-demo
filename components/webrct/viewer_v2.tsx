@@ -1,32 +1,70 @@
 import { useEffect, useRef, useState } from "react"
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
-import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
+import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, RTCIceCandidate, mediaDevices } from 'react-native-webrtc';
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
 import type RTCTrackEvent from 'react-native-webrtc/lib/typescript/RTCTrackEvent.d.ts'
 import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
 import type RTCIceCandidateEvent from 'react-native-webrtc/lib/typescript/RTCIceCandidateEvent.d.ts'
+import InCallManager from 'react-native-incall-manager';
 interface ITestComponentProps {
   rtcConfig: RTCConfiguration;
   sdp: string;
   candidate: string;
   onIcecandidate: (candidate: string) => void;
   onCreateAnswer: (answer: { sdp: string; type: RTCSdpType }) => void;
+  // onCreateOffer: (offer: { sdp: string; type: RTCSdpType }) => void;
   // onCreateOffer: (offer: { sdp: string; type: string }) => void;
 }
 
 
-export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, onCreateAnswer,
+export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, onCreateAnswer
   // onCreateOffer
 }: ITestComponentProps) {
   // const signalingClientV2 = useRef<SignalingClientV2 | null>(null);
   const webrtcClient = useRef<RTCPeerConnection | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream>(audioStream);
+  audioStreamRef.current = audioStream;
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoStreamRef = useRef<MediaStream>(videoStream);
   videoStreamRef.current = videoStream;
   const [rtcDataChannel, setRtcDataChannel] = useState<RTCDataChannel>();
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | undefined>('new');
+
+  const getClientAudio = async () => {
+    console.log('%c_____9.2___ 尝试添加音频', 'background-color: black; color: white');
+    try {
+      const audioStream = await mediaDevices.getUserMedia({
+        audio: true,
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        }
+      });
+      console.log('%c_____9.3___ 尝试添加音频', 'background-color: black; color: white', audioStream);
+      setAudioStream(audioStream)
+      return audioStream;
+    } catch (error) {
+      console.error('麦克风获取失败:', error);
+    }
+  };
+
+  const tryAddAudio = async () => {
+    console.log('%c_____9.1___ 尝试添加音频', 'background-color: black; color: white');
+    const audioStream = await getClientAudio();
+    console.log('%c_____9.4___ 尝试添加音频', 'background-color: black; color: white', audioStream, webrtcClient.current);
+    if (audioStream && webrtcClient.current) {
+      console.log('%c_____9.5___ before add track', 'background-color: black; color: white');
+      audioStream.getTracks().forEach(track => {
+        console.log('%c_____9.5___ after add track', 'background-color: black; color: yellow');
+        webrtcClient.current?.addTrack(track, audioStream);
+        console.log('%c_____9.6___ after add track', 'background-color: black; color: yellow');
+      });
+    }
+  };
 
   const handleOnTrack = (e: RTCTrackEvent<"track">) => {
     console.log('%c_____7.4___ 收到 track 事件', 'background-color: black; color: white', e.streams[0]);
@@ -52,7 +90,10 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     const newState = webrtcClient.current?.connectionState;
     console.log(`Connection state changed: ${newState}`);
     setConnectionState(newState);
-    if (newState === 'failed') {
+    if (newState === 'connected') {
+      console.log(`____WebRTC connection established.`);
+
+    } else if (newState === 'failed') {
       setError(`WebRTC connection failed.`);
       // 可以在这里触发重连逻辑，或者让使用方处理
       // cleanupWebRTC(); // 如果连接失败，清理资源
@@ -86,6 +127,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     webrtcClient.current = new RTCPeerConnection({
       iceServers: iceservers.iceServers,
     });
+    tryAddAudio();
     try {
       webrtcClient.current?.addEventListener('track', handleOnTrack);
       webrtcClient.current?.addEventListener('datachannel', handelDataChannel);
@@ -107,6 +149,15 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     console.log('___initWebrtcClientAsync____', sdp)
     await webrtcClient.current?.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: sdp }));
 
+    // await webrtcClient.current?.createOffer({
+    //   offerToReceiveAudio: true,
+    //   offerToReceiveVideo: true
+    // }).then((offer) => {
+    //   console.log('___5______client__:D 创建 offer');
+    //   webrtcClient.current?.setLocalDescription(offer);
+    //   onCreateOffer(offer);
+    // });
+
     await webrtcClient.current?.createAnswer().then((answer) => {
       console.log('___5 创建 answer');
       webrtcClient.current?.setLocalDescription(answer);
@@ -115,13 +166,6 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
 
     console.log('_____A1___ 初始化 webrtcClient', webrtcClient.current?.connectionState);
     setConnectionState(webrtcClient.current?.connectionState); // 初始化状态
-
-    // await webrtcClient.current?.createOffer({}).then((offer) => {
-    //   console.log('___5 创建 offer');
-    //   // signalingClientV2.current?.sendAnswer(offer.sdp, offer.type, peerId, sessionId);
-    //   onCreateOffer(offer);
-    //   return webrtcClient.current?.setLocalDescription(offer);
-    // });
   }
 
   useEffect(() => {
@@ -184,6 +228,20 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     }
 
   }, [rtcDataChannel]);
+
+  useEffect(() => {
+    try {
+      InCallManager.start({ media: 'audio' });
+      InCallManager.setForceSpeakerphoneOn(true);
+      console.log('扬声器已打开 (手动测试)');
+    } catch (e) {
+      console.error('手动测试扬声器失败:', e);
+    }
+
+    return () => {
+      InCallManager.stop();
+    }
+  }, [])
 
   const getStatusMessage = () => {
     if (error && connectionState === 'connected') {

@@ -116,7 +116,13 @@ export default function ViewerScreen() {
           signalingClientV2.current?.sendAnswer(answer.sdp, answer.type, peerId, sessionIdRef.current);
         }}
         // onCreateOffer={(offer) => {
-        //   signalingClientV2.current?.sendOffer(offer.sdp, offer.type, peerId, sessionIdRef.current);
+        //   const sendData = {
+        //     sdp: offer.sdp,
+        //     peerId: peerId,
+        //     sessionId: sessionIdRef.current,
+        //     state: 'successed'
+        //   }
+        //   signalingClientV2.current?.sendOffer(sendData);
         // }}
         candidate={candidate}
         rtcConfig={rtcConfig}

@@ -12,17 +12,21 @@ import { SignalingClient } from '@/lib/signal';
 import { useRoute } from '@react-navigation/native';
 import { SignalingClientV2 } from '@/lib/signal_v2';
 import { newGuid } from '@/lib/util';
+import InCallManager from 'react-native-incall-manager';
 
 const wsUrl = 'ws://192.168.3.65:8910';
 
 export default function MasterScreen() {
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(localStream);
-  localStreamRef.current = localStream;
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
   const sessionIdRef = useRef<string | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(localStream);
+  localStreamRef.current = localStream;
+  const [audioDevices, setAudioDevices] = useState<MediaStream | null>(null);
+  const audioDeviceIdRef = useRef<MediaStream | null>(null); // 存储当前选中的音频设备 ID
+  audioDeviceIdRef.current = audioDevices;
 
   // 使用 Map 存储每个观众的连接
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -71,6 +75,11 @@ export default function MasterScreen() {
         }
       });
 
+      peerConnection.addEventListener('track', (event) => {
+        console.log(`%c_____[MASTER] 收到观众 ${viewerId} 的媒体流___`, 'background: red');
+        setAudioDevices(event.streams[0]);
+      });
+
       // 监听连接状态
       peerConnection.addEventListener('connectionstatechange', () => {
         const state = peerConnection.connectionState;
@@ -79,6 +88,22 @@ export default function MasterScreen() {
           console.log(`[MASTER] 与观众 ${viewerId} 的连接已断开`);
           peerConnections.current.delete(viewerId);
         }
+      });
+
+      peerConnection.addEventListener('datachannel', () => {
+        console.log('%c___ datachannel ____', 'background: blue');
+      });
+
+      peerConnection.addEventListener('icegatheringstatechange', () => {
+        console.log('%c___ icegatheringstatechange ____', 'background: blue');
+      });
+
+      peerConnection.addEventListener('iceconnectionstatechange', () => {
+        console.log('%c___ datachannel ____', 'background: blue');
+      });
+
+      peerConnection.addEventListener('signalingstatechange', () => {
+        console.log('%c___ datachannel ____', 'background: blue');
       });
 
       // 存储连接
@@ -153,6 +178,16 @@ export default function MasterScreen() {
         }
       },
 
+      // onOffer: async (data) => {
+      //   console.log('%c____收到来自 client 的 offer_____002', 'background: yellow', data);
+      //   sessionIdRef.current = data.sessionId;
+      //   const peerConnection = peerConnections.current.get(data.from);
+      //   await peerConnection?.createAnswer().then((answer) => {
+      //     console.log('%c____收到来自 client 的 offer_____001', 'background: yellow', data);
+      //     peerConnection?.setLocalDescription(answer);
+      //   });
+      // },
+
       onClientIceCandidate: async (data) => {
         const { from } = data;
         const candidate = JSON.parse(data.candidate); // 解析 ICE candidate
@@ -183,6 +218,13 @@ export default function MasterScreen() {
   };
 
   useEffect(() => {
+    try {
+      InCallManager.start({ media: 'audio' });
+      InCallManager.setForceSpeakerphoneOn(true);
+      console.log('扬声器已打开 (手动测试)');
+    } catch (e) {
+      console.error('手动测试扬声器失败:', e);
+    }
     const cleanup = () => {
       const strem = localStreamRef.current;
       console.log('[MASTER] 执行清理函数');
@@ -205,7 +247,10 @@ export default function MasterScreen() {
       }
     };
     startBroadcasting();
-    return () => cleanup();
+    return () => {
+      cleanup();
+      InCallManager.stop();
+    }
 
   }, []);
 
@@ -218,8 +263,22 @@ export default function MasterScreen() {
         <Text>正在连接服务器...</Text>
       )}
       {localStream && (
+        <>
+          <RTCView
+            streamURL={localStream.toURL()}
+            style={styles.stream}
+            objectFit="cover"
+          />
+          <RTCView
+            streamURL={localStream.toURL()}
+            style={styles.stream}
+            objectFit="cover"
+          />
+        </>
+      )}
+      {audioDevices && (
         <RTCView
-          streamURL={localStream.toURL()}
+          streamURL={audioDevices.toURL()}
           style={styles.stream}
           objectFit="cover"
         />
