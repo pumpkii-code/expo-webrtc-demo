@@ -13,10 +13,13 @@ const userMap = {};
 const connections = {
   // [viewId]:[masterId]
 };
+const connectionsData = {};
+// 存储所有设备端的信息
+const devicesMap = {};
 
 const formatMessage = (eventName, data, ws) => {
   const { sessionId, messageId, sessionType, from, to } = data;
-  let sendData = {};
+  let formatData = {};
 
   switch (eventName) {
     case '__connectto':
@@ -26,7 +29,7 @@ const formatMessage = (eventName, data, ws) => {
 
       // State： 需要访问的设备号的在线状态：online，offline
       // iceServers：服务器下发的 iceServers 的地址。创建webrtc 使用这个地址创建。并且再后面的 call 命令中发给设备端。
-      sendData = {
+      formatData = {
         eventName: '_create',
         data: {
           // domainnameiceServers: domainnameiceServers,
@@ -48,7 +51,7 @@ const formatMessage = (eventName, data, ws) => {
         return;
       }
       const { audio, datachannel, mode, pwd, source, user, video } = data;
-      sendData = {
+      formatData = {
         eventName: '__call',
         data: {
           audio: audio,
@@ -71,7 +74,7 @@ const formatMessage = (eventName, data, ws) => {
 
     case '_offer':
       const {} = data;
-      sendData = {
+      formatData = {
         eventName: '_offer',
         data: {
           audio: '',
@@ -96,7 +99,7 @@ const formatMessage = (eventName, data, ws) => {
 
     case '__answer':
       const { sdp } = data;
-      sendData = {
+      formatData = {
         eventName: '__answer',
         data: {
           from: from,
@@ -111,7 +114,7 @@ const formatMessage = (eventName, data, ws) => {
       break;
 
     case '__ice_candidate':
-      sendData = {
+      formatData = {
         eventName: '__ice_candidate',
         data: {
           candidate: data.candidate,
@@ -125,7 +128,7 @@ const formatMessage = (eventName, data, ws) => {
       break;
 
     case '_ice_candidate':
-      sendData = {
+      formatData = {
         eventName: '_ice_candidate',
         data: {
           candidate: data.candidate,
@@ -143,10 +146,8 @@ const formatMessage = (eventName, data, ws) => {
       break;
   }
 
-  return sendData;
+  return formatData;
 };
-
-const connectionsData = {};
 
 const iceservers = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}',
   iceServers =
@@ -157,163 +158,75 @@ const iceservers = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}',
 wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     const { eventName, data } = JSON.parse(message);
-    const { sessionId, messageId, sessionType, from, to } = data;
-    var sendData = {};
     console.log('Received message:', eventName);
 
+    // 设备端注册 这个是例外, 没有额外的参数
     if (eventName === '_register') {
       ws.peerId = data.peerId;
       userMap[data.peerId] = ws;
+      devicesMap[data.peerId] = {};
       console.log('设备端注册成功');
+
+      // 如果有未完成的连接，发送给目标设备
+      const waitingViewers = Object.keys(connections).filter(
+        (viewerId) => connections[viewerId] === data.peerId
+      );
+
+      console.log('waitingViewers', data.peerId, waitingViewers);
+
+      waitingViewers.forEach((viewerId) => {
+        devicesMap[data.peerId][viewerId] = true;
+        userMap[viewerId].send(JSON.stringify(connectionsData[viewerId]));
+        delete connections[viewerId];
+        delete connectionsData[viewerId];
+
+        console.log(
+          '清除所有等待该设备的连接__connections',
+          JSON.stringify(connections)
+        );
+        console.log(
+          '清除所有等待该设备的连接__connectionsData',
+          JSON.stringify(connectionsData)
+        );
+      });
       return;
     }
+
+    // 其他事件 是包含这些所有参数的
+    const { sessionId, messageId, sessionType, from, to } = data;
 
     if (!sessionId || !messageId || !sessionType || !from || !to) {
       console.error('缺少必要参数');
       return;
     }
 
+    const sendData = formatMessage(eventName, data, ws);
+
+    if (!sendData) {
+      console.error('发送数据为空');
+      return;
+    }
+
     if (!userMap[to]) {
-      if (!connections[to]) {
-        connections[to] = [];
-      }
-      connections[to].append(from);
-      connectionsData[from] = data;
+      connections[from] = to;
+      connectionsData[from] = sendData;
+
+      console.log('connections', JSON.stringify(connections));
+      console.log('connectionsData', JSON.stringify(connectionsData));
       console.error('设备不在线', to);
       return;
     }
 
-    switch (eventName) {
-      case '__connectto':
-        // 存储用户信息
-        ws.peerId = from;
-        userMap[from] = ws;
-
-        // State： 需要访问的设备号的在线状态：online，offline
-        // iceServers：服务器下发的 iceServers 的地址。创建webrtc 使用这个地址创建。并且再后面的 call 命令中发给设备端。
-        sendData = {
-          eventName: '_create',
-          data: {
-            // domainnameiceServers: domainnameiceServers,
-            from: to,
-            iceservers: iceServers,
-            messageId: messageId,
-            sessionId: sessionId,
-            sessionType: sessionType,
-            state: 'online',
-            to: from,
-            iceServers: iceServers,
-          },
-        };
-        userMap[from].send(JSON.stringify(sendData));
-        return;
-
-      case '__call':
-        if (!userMap[to]) {
-          console.error('设备未开机');
-          return;
-        }
-        const { audio, datachannel, mode, pwd, source, user, video } = data;
-        sendData = {
-          eventName: '__call',
-          data: {
-            audio: audio,
-            datachannel: datachannel,
-            from: from,
-            iceservers: iceServers,
-            messageId: messageId,
-            mode: mode,
-            pwd: pwd,
-            sessionId: sessionId,
-            sessionType: sessionType,
-            source: source,
-            state: 'successed',
-            to: to,
-            user: user,
-            video: video,
-          },
-        };
-        break;
-
-      case '_offer':
-        const {} = data;
-        sendData = {
-          eventName: '_offer',
-          data: {
-            audio: '',
-            datachannel: '',
-            from: from,
-            iceservers: iceServers,
-            messageId: messageId,
-            mode: '',
-            pwd: '',
-            sdp: data.sdp,
-            sessionId: sessionId,
-            sessionType: sessionType,
-            source: '',
-            state: 'successed',
-            to: to,
-            type: 'offer',
-            user: '',
-            video: '',
-          },
-        };
-        break;
-
-      case '__answer':
-        const { sdp } = data;
-        sendData = {
-          eventName: '__answer',
-          data: {
-            from: from,
-            messageId: messageId,
-            sdp: sdp,
-            sessionId: sessionId,
-            sessionType: sessionType,
-            to: to,
-            type: 'answer',
-          },
-        };
-        break;
-
-      case '__ice_candidate':
-        sendData = {
-          eventName: '__ice_candidate',
-          data: {
-            candidate: data.candidate,
-            from: from,
-            messageId: messageId,
-            sessionId: sessionId,
-            sessionType: sessionType,
-            to: to,
-          },
-        };
-        break;
-
-      case '_ice_candidate':
-        sendData = {
-          eventName: '_ice_candidate',
-          data: {
-            candidate: data.candidate,
-            from: from,
-            messageId: messageId,
-            sessionId: sessionId,
-            sessionType: sessionType,
-            to: to,
-          },
-        };
-        break;
-
-      default:
-        console.warn('未知事件', eventName);
-        break;
-    }
-
     // 统一转发
-    if (userMap[to]) {
-      userMap[to].send(JSON.stringify(sendData));
+    if (eventName === '__connectto') {
+      userMap[from].send(JSON.stringify(sendData));
+      return;
     } else {
-      console.error('目标用户不在线', to);
+      if (userMap[to]) {
+        userMap[to].send(JSON.stringify(sendData));
+      } else {
+        console.error('目标用户不在线', to);
+      }
     }
   });
 
@@ -322,12 +235,30 @@ wss.on('connection', (ws) => {
     const peerId = ws.peerId;
     if (peerId && userMap[peerId]) {
       console.log(`Peer ${peerId} 断开连接`);
+
+      if (devicesMap[peerId]) {
+        // 通知所有设备端该用户已离线
+        Object.keys(devicesMap[peerId]).forEach((client) => {
+          if (userMap[client]) {
+            userMap[client].send(
+              JSON.stringify({
+                eventName: '_offline',
+                data: {
+                  peerId: peerId,
+                },
+              })
+            );
+          }
+        });
+      }
+
       delete userMap[peerId];
       delete connections[peerId];
+      delete connectionsData[peerId];
     }
 
     //如果是用户，则需要从
   });
 });
 
-console.log('Signaling server running on ws://localhost: ' + port);
+console.log('ws____Signaling server running on ws://localhost: ' + port);

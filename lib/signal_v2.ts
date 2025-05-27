@@ -186,6 +186,10 @@ export class SignalingClientV2 {
         case '_ping':
           break;
 
+        // 设备端断开连接
+        case '_offline':
+          break;
+
         case '_connectinfo':
           break;
 

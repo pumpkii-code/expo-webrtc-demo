@@ -124,6 +124,12 @@ export type SignalReceverMessage =
       };
     }
   | {
+      eventName: '_offline';
+      data: {
+        peerId: string;
+      };
+    }
+  | {
       eventName: '__ice_candidate';
       data: BaseMessageData & IcePostData;
     };
