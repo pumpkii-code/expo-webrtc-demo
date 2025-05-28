@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react"
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
-import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, RTCIceCandidate, mediaDevices } from 'react-native-webrtc';
+import { View, Text, StyleSheet, ActivityIndicator, Button } from "react-native";
+import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, MediaStreamTrack, mediaDevices } from 'react-native-webrtc';
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
 import type RTCTrackEvent from 'react-native-webrtc/lib/typescript/RTCTrackEvent.d.ts'
 import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
 import type RTCIceCandidateEvent from 'react-native-webrtc/lib/typescript/RTCIceCandidateEvent.d.ts'
 import InCallManager from 'react-native-incall-manager';
+import AudioButton from "../menu/audio-button";
 interface ITestComponentProps {
   rtcConfig: RTCConfiguration;
   sdp: string;
@@ -32,17 +33,20 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
   const [rtcDataChannel, setRtcDataChannel] = useState<RTCDataChannel>();
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | undefined>('new');
+  const audioTrackRef = useRef<MediaStreamTrack[] | null>(null);
+  const [enableAudio, setEnableAudio] = useState<boolean>(false);
 
   const getClientAudio = async () => {
     console.log('%c_____9.2___ 尝试添加音频', 'background-color: black; color: white');
     try {
       const audioStream = await mediaDevices.getUserMedia({
         audio: true,
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        }
+        // video: {
+        //   facingMode: 'user',
+        //   width: { ideal: 1280 },
+        //   height: { ideal: 720 },
+        // }
+        video: false
       });
       console.log('%c_____9.3___ 尝试添加音频', 'background-color: black; color: white', audioStream);
       setAudioStream(audioStream)
@@ -58,13 +62,27 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     console.log('%c_____9.4___ 尝试添加音频', 'background-color: black; color: white', audioStream, webrtcClient.current);
     if (audioStream && webrtcClient.current) {
       console.log('%c_____9.5___ before add track', 'background-color: black; color: white');
-      audioStream.getTracks().forEach(track => {
+      audioTrackRef.current = audioStream.getAudioTracks();
+      audioTrackRef.current.forEach(track => {
+        track.enabled = false;
         console.log('%c_____9.5___ after add track', 'background-color: black; color: yellow');
         webrtcClient.current?.addTrack(track, audioStream);
         console.log('%c_____9.6___ after add track', 'background-color: black; color: yellow');
       });
     }
   };
+
+  const handleScreenshot = () => {
+    console.log('handleScreenshot');
+  }
+  const handleRecord = () => {
+    audioTrackRef.current?.forEach(track => {
+      track.enabled = !enableAudio;
+      console.log('handleRecord', track.enabled);
+    })
+    setEnableAudio(!enableAudio)
+    console.log('handleRecord');
+  }
 
   const handleOnTrack = (e: RTCTrackEvent<"track">) => {
     console.log('%c_____7.4___ 收到 track 事件', 'background-color: black; color: white', e.streams[0]);
@@ -96,8 +114,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     } else if (newState === 'failed') {
       setError(`WebRTC connection failed.`);
       // 可以在这里触发重连逻辑，或者让使用方处理
-      // cleanupWebRTC(); // 如果连接失败，清理资源
-    } else if (newState === 'disconnected') {
+      // cleanupWebRTC(); // 如果连接失败，清理资源    } else if (newState === 'disconnected') {
       console.warn(`WebRTC connection disconnected. May recover or may need reconnection.`);
       // 'disconnected' 状态有时可以自动恢复，但如果长时间停留，也视为失败
     } else if (newState === 'closed') {
@@ -269,11 +286,23 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
   // 完全准备完毕
   if (videoStream && connectionState === 'connected' && !error) {
     return (
-      <RTCView
-        streamURL={videoStream.toURL()}
-        style={styles.stream}
-        objectFit="contain"
-      />
+      <>
+        <View style={styles.viewContainer}>
+          <RTCView
+            streamURL={videoStream.toURL()}
+            style={styles.stream}
+            objectFit="contain"
+          />
+          {/* 绝对定位按钮区域 */}
+          <View style={styles.buttonContainer}>
+            <View style={styles.buttonRow}>
+              <Button title="截屏" onPress={handleScreenshot} color="#fff" />
+              <Button title="录屏" onPress={handleRecord} color="#fff" />
+              <AudioButton audioTrack={audioTrackRef.current} />
+            </View>
+          </View>
+        </View>
+      </>
     );
   } else {
     return (
@@ -290,6 +319,13 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
 }
 
 const styles = StyleSheet.create({
+  viewContainer: {
+    display: 'flex',
+    flex: 1,
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -325,5 +361,15 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  buttonContainer: {
+    position: 'absolute',
+    left: 20,
+    bottom: 40,
+    zIndex: 10,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
 });

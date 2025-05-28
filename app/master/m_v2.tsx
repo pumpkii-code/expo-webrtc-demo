@@ -255,35 +255,32 @@ export default function MasterScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      {error && (
-        <Text style={styles.error}>{error}</Text>
-      )}
-      {!connected && !error && (
-        <Text>正在连接服务器...</Text>
-      )}
-      {localStream && (
-        <>
-          <RTCView
-            streamURL={localStream.toURL()}
-            style={styles.stream}
-            objectFit="cover"
-          />
-          <RTCView
-            streamURL={localStream.toURL()}
-            style={styles.stream}
-            objectFit="cover"
-          />
-        </>
-      )}
+    <>
+      <View style={styles.container}>
+        {error && (
+          <Text style={styles.error}>{error}</Text>
+        )}
+        {!connected && !error && (
+          <Text>正在连接服务器...</Text>
+        )}
+        {localStream && (
+          <>
+            <RTCView
+              streamURL={localStream.toURL()}
+              style={styles.stream}
+              objectFit="cover"
+            />
+          </>
+        )}
+      </View>
       {audioDevices && (
         <RTCView
           streamURL={audioDevices.toURL()}
-          style={styles.stream}
+          style={styles.audioStream}
           objectFit="cover"
         />
       )}
-    </View>
+    </>
   );
 }
 
@@ -293,11 +290,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#000',
+    position: 'relative', // 确保子元素可以定位在父元素上
   },
   stream: {
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  audioStream: {
+    position: 'absolute',
+    opacity: 0,
+    width: 0,
+    height: 0,
+    top: 0,
+    left: 0,
   },
   error: {
     color: 'red',

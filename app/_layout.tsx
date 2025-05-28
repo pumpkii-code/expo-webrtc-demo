@@ -94,6 +94,14 @@ function RootLayoutNav() {
             animation: 'none'
           }}
         />
+        <Stack.Screen
+          name="master/m_v2"
+          options={{
+            headerShown: false,
+            orientation: 'landscape',  // 添加这行来强制横屏
+            animation: 'none'
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );
