@@ -34,7 +34,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | undefined>('new');
   const audioTrackRef = useRef<MediaStreamTrack[] | null>(null);
-  const [enableAudio, setEnableAudio] = useState<boolean>(false);
+  const deviceVideoTrackRef = useRef<MediaStreamTrack[] | null>(null);
 
   const getClientAudio = async () => {
     console.log('%c_____9.2___ 尝试添加音频', 'background-color: black; color: white');
@@ -76,17 +76,16 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     console.log('handleScreenshot');
   }
   const handleRecord = () => {
-    audioTrackRef.current?.forEach(track => {
-      track.enabled = !enableAudio;
-      console.log('handleRecord', track.enabled);
-    })
-    setEnableAudio(!enableAudio)
     console.log('handleRecord');
   }
 
   const handleOnTrack = (e: RTCTrackEvent<"track">) => {
     console.log('%c_____7.4___ 收到 track 事件', 'background-color: black; color: white', e.streams[0]);
     const stream = e.streams[0];
+    deviceVideoTrackRef.current = stream.getAudioTracks();
+    deviceVideoTrackRef.current.forEach(track => {
+      track.enabled = false;
+    });
     setVideoStream(stream);
   }
 
@@ -298,7 +297,8 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
             <View style={styles.buttonRow}>
               <Button title="截屏" onPress={handleScreenshot} color="#fff" />
               <Button title="录屏" onPress={handleRecord} color="#fff" />
-              <AudioButton audioTrack={audioTrackRef.current} />
+              <AudioButton audioTrack={audioTrackRef.current} enableTitle="开启客户端声音" disableTitle="关闭客户端声音" />
+              <AudioButton audioTrack={deviceVideoTrackRef.current} enableTitle="接收设备声音" disableTitle="不接收设备声音" />
             </View>
           </View>
         </View>

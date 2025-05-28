@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "react-native"
 import { mediaDevices, RTCPeerConnection, MediaStreamTrack } from "react-native-webrtc";
 
-export default function AudioButton({ audioTrack }: {
-  audioTrack: MediaStreamTrack[] | null
-}) {
+interface AudioButtonProps {
+  audioTrack: MediaStreamTrack[] | null;
+  enableTitle: string;
+  disableTitle: string;
+}
+
+export default function AudioButton({ audioTrack, enableTitle, disableTitle }: AudioButtonProps) {
   const [audioEnabled, setAudioEnabled] = useState(false);
 
   const handleAudioCall = async () => {
@@ -14,5 +18,5 @@ export default function AudioButton({ audioTrack }: {
     setAudioEnabled(!audioEnabled);
   };
 
-  return <Button title={audioEnabled ? "关闭语音" : "开启语音"} onPress={handleAudioCall} color="#fff" />;
+  return <Button title={(audioEnabled ? enableTitle : disableTitle)} onPress={handleAudioCall} color="#fff" />;
 }
