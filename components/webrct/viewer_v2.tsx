@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { View, Text, StyleSheet, ActivityIndicator, Button } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Button, Platform, Alert } from "react-native";
 import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, MediaStreamTrack, mediaDevices } from 'react-native-webrtc';
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
@@ -8,6 +8,9 @@ import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCData
 import type RTCIceCandidateEvent from 'react-native-webrtc/lib/typescript/RTCIceCandidateEvent.d.ts'
 import InCallManager from 'react-native-incall-manager';
 import AudioButton from "../menu/audio-button";
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import RNFS from 'react-native-fs';
+
 interface ITestComponentProps {
   rtcConfig: RTCConfiguration;
   sdp: string;
@@ -35,6 +38,9 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | undefined>('new');
   const audioTrackRef = useRef<MediaStreamTrack[] | null>(null);
   const deviceVideoTrackRef = useRef<MediaStreamTrack[] | null>(null);
+  const [isTakingShot, setIsTakingShot] = useState(false);
+  const viewShotRef = useRef<ViewShot>(null);
+  const [screenshotUri, setScreenshotUri] = useState<string | null>(null);
 
   const getClientAudio = async () => {
     console.log('%c_____9.2___ 尝试添加音频', 'background-color: black; color: white');
@@ -72,9 +78,52 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     }
   };
 
-  const handleScreenshot = () => {
-    console.log('handleScreenshot');
-  }
+  const takeScreenshotAndSave = async () => {
+    if (isTakingShot || !viewShotRef.current) {
+      return;
+    }
+    setIsTakingShot(true);
+    setScreenshotUri(null); // 清除旧截图
+
+    try {
+      console.log("开始捕获...");
+      const uri = await captureRef(viewShotRef, {
+        format: 'jpg',   // 保存格式 (jpg 或 png)
+        quality: 0.9,    // 图片质量 (0.0 - 1.0)
+        result: 'tmpfile', // 'tmpfile', 'base64', 或 'data-uri'
+      });
+      console.log('捕获成功，临时 URI:', uri);
+
+      const fileName = `screenshot_${Date.now()}.jpg`;
+      const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+
+      console.log('准备移动文件到:', destPath);
+      await RNFS.moveFile(uri, destPath); // 移动临时文件到永久位置
+      console.log('文件移动成功!');
+
+      // 使用 Platform.select 来处理不同平台的路径格式，以便 Image 组件能正确显示
+      const displayUri = Platform.select({
+        android: `file://${destPath}`,
+        ios: destPath,
+      });
+
+      setScreenshotUri(displayUri!);
+      console.log('截图保存成功:', displayUri);
+      Alert.alert(
+        '截图保存成功',
+      )
+
+    } catch (error) {
+      console.error('截图或保存失败:', error);
+      console.error(
+        '截图失败',
+        '无法捕获或保存图片。这很可能是因为 RTCView 无法被 ViewShot 捕获 (黑屏问题)。请检查控制台日志。'
+      );
+    } finally {
+      setIsTakingShot(false);
+    }
+  };
+
   const handleRecord = () => {
     console.log('handleRecord');
   }
@@ -82,6 +131,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
   const handleOnTrack = (e: RTCTrackEvent<"track">) => {
     console.log('%c_____7.4___ 收到 track 事件', 'background-color: black; color: white', e.streams[0]);
     const stream = e.streams[0];
+    console.log('%c______stream___stream', 'background-color: blue', stream)
     deviceVideoTrackRef.current = stream.getAudioTracks();
     deviceVideoTrackRef.current.forEach(track => {
       track.enabled = false;
@@ -287,15 +337,17 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, onIcecandidate, o
     return (
       <>
         <View style={styles.viewContainer}>
-          <RTCView
-            streamURL={videoStream.toURL()}
-            style={styles.stream}
-            objectFit="contain"
-          />
+          <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }} style={styles.rtcViewContainer}>
+            <RTCView
+              streamURL={videoStream.toURL()}
+              style={styles.stream}
+              objectFit="contain"
+            />
+          </ViewShot>
           {/* 绝对定位按钮区域 */}
           <View style={styles.buttonContainer}>
             <View style={styles.buttonRow}>
-              <Button title="截屏" onPress={handleScreenshot} color="#fff" />
+              <Button title="截屏" onPress={takeScreenshotAndSave} color="#fff" />
               <Button title="录屏" onPress={handleRecord} color="#fff" />
               <AudioButton audioTrack={audioTrackRef.current} enableTitle="开启客户端声音" disableTitle="关闭客户端声音" />
               <AudioButton audioTrack={deviceVideoTrackRef.current} enableTitle="接收设备声音" disableTitle="不接收设备声音" />
@@ -323,6 +375,12 @@ const styles = StyleSheet.create({
     display: 'flex',
     flex: 1,
     position: 'relative',
+    width: '100%',
+    height: '100%',
+  },
+  rtcViewContainer: {
+    display: 'flex',
+    flex: 1,
     width: '100%',
     height: '100%',
   },
