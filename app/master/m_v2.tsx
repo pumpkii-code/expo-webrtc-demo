@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { Button, StyleSheet } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   RTCPeerConnection,
@@ -13,6 +13,10 @@ import { useRoute } from '@react-navigation/native';
 import { SignalingClientV2 } from '@/lib/signal_v2';
 import { newGuid } from '@/lib/util';
 import InCallManager from 'react-native-incall-manager';
+import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
+import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
+import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
+import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
 
 const wsUrl = 'ws://192.168.3.65:8910';
 
@@ -27,10 +31,147 @@ export default function MasterScreen() {
   const [audioDevices, setAudioDevices] = useState<MediaStream | null>(null);
   const audioDeviceIdRef = useRef<MediaStream | null>(null); // 存储当前选中的音频设备 ID
   audioDeviceIdRef.current = audioDevices;
+  const [dataChannels, setDataChannels] = useState<Map<string, RTCDataChannel>>(new Map());
+
+  const changeBitrate = (data: { bitrate: number }, viewerId: string) => {
+    console.log('收到切换码率请求', data);
+
+    // 确保 data 包含有效的码率值
+    if (!data || typeof data.bitrate !== 'number') {
+      console.error('无效的码率数据', data);
+      return;
+    }
+
+    const bitrate = data.bitrate; // 单位：bps
+
+    // 遍历所有活跃的对等连接
+    peerConnections.current.forEach((pc, viewerId) => {
+      // 获取所有发送器
+      const senders = pc.getSenders();
+
+      // 找到视频发送器
+      const videoSender = senders.find(sender =>
+        sender.track && sender.track.kind === 'video'
+      );
+
+      if (videoSender) {
+        // 获取当前参数
+        const parameters = videoSender.getParameters();
+
+        // 确保参数对象已初始化
+        if (!parameters.encodings) {
+          parameters.encodings = [];
+        }
+
+        // 设置最大码率
+        // 如果有多个编码层，可以分别设置
+        parameters.encodings.forEach(encoding => {
+          encoding.maxBitrate = bitrate;
+        });
+
+        // 应用新参数
+        videoSender.setParameters(parameters)
+          .then(() => {
+            console.log(`成功为观众 ${viewerId} 设置新码率: ${bitrate}bps`);
+            sendMessage({
+              type: 'changeBitrate',
+              data: JSON.stringify({
+                state: 'successed',
+                bitrate: bitrate
+              }),
+              targetViewerId: viewerId
+            })
+          })
+          .catch(error => {
+            sendMessage({
+              type: 'changeBitrate',
+              data: JSON.stringify({
+                state: 'failed',
+              }),
+              targetViewerId: viewerId
+            })
+            console.error(`为观众 ${viewerId} 设置码率失败:`, error);
+          });
+      } else {
+        console.warn(`未找到观众 ${viewerId} 的视频发送器`);
+      }
+    });
+  }
 
   // 使用 Map 存储每个观众的连接
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const signalingClientV2 = useRef<SignalingClientV2 | null>(null);
+
+  const handleDataChannelOpen = (event: RTCDataChannelEvent<'open'>) => {
+    console.log('Data channel opened for viewer:');
+  }
+
+  const handleDataChannelMessage = (event: MessageEvent<'message'>) => {
+    console.log('%c_____Received message from viewer:', 'background:chartreuse', event.data);
+    const data = event.data as string;
+    const message = JSON.parse(data);
+
+    switch (message.type) {
+      case 'changeBitrate':
+        changeBitrate(JSON.parse(message.data), message.viewerId);
+        break;
+
+      default:
+        break;
+    }
+  };
+
+  const handleDataChannelError = (event: RTCDataChannelEvent<'error'>) => {
+    console.error('Data channel error:', event);
+  };
+
+  const handleDataChannelClose = (event: RTCDataChannelEvent<'close'>) => {
+    console.log('Data channel closed for viewer:', event);
+  };
+
+  // 创建数据通道的函数
+  const createDataChannel = (peerConnection: RTCPeerConnection, viewerId: string) => {
+    const dataChannel = peerConnection.createDataChannel('chat', {
+      ordered: true, // 保证消息顺序
+      maxRetransmits: 3 // 重传次数
+    });
+
+    console.log('%c___创建 channel', 'background: antiquewhite');
+
+    dataChannel.addEventListener('open', handleDataChannelOpen);
+    dataChannel.addEventListener('message', handleDataChannelMessage);
+    dataChannel.addEventListener('error', handleDataChannelError);
+    dataChannel.addEventListener('close', handleDataChannelClose);
+
+    // 保存数据通道引用
+    setDataChannels(prev => new Map(prev.set(viewerId, dataChannel)));
+
+    return dataChannel;
+  };
+
+  // 发送消息函数
+  const sendMessage = ({ type, data, targetViewerId }: RTCDataChannelSendMessageProps) => {
+    const message = {
+      type,
+      data,
+      from: 'master'
+    };
+
+    if (targetViewerId) {
+      // 发送给特定观众
+      const dataChannel = dataChannels.get(targetViewerId);
+      if (dataChannel && dataChannel.readyState === 'open') {
+        dataChannel.send(JSON.stringify(message));
+      }
+    } else {
+      // 广播给所有观众
+      dataChannels.forEach((dataChannel, viewerId) => {
+        if (dataChannel.readyState === 'open') {
+          dataChannel.send(JSON.stringify(message));
+        }
+      });
+    }
+  };
 
   // 初始化摄像头
   const setupCamera = async () => {
@@ -62,7 +203,17 @@ export default function MasterScreen() {
 
       // 添加本地流
       stream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, stream);
+        const sender = peerConnection.addTrack(track, stream);
+
+        // 设置最大码率
+        const parameters = sender.getParameters();
+        if (!parameters.encodings) {
+          parameters.encodings = [];
+        }
+        parameters.encodings[0].maxBitrate = 2500000;
+        sender.setParameters(parameters)
+          .then(() => console.log('设置初始码率成功: 2500000'))
+          .catch(err => console.error('设置初始码率失败:', err));
       });
 
       // 处理 ICE candidate
@@ -88,23 +239,28 @@ export default function MasterScreen() {
           console.log(`[MASTER] 与观众 ${viewerId} 的连接已断开`);
           peerConnections.current.delete(viewerId);
         }
+        if (state === 'connected') {
+          console.log(`[MASTER] 与观众 ${viewerId} 的连接已建立`);
+        }
       });
 
-      peerConnection.addEventListener('datachannel', () => {
-        console.log('%c___ datachannel ____', 'background: blue');
-      });
+      // peerConnection.addEventListener('datachannel', () => {
+      //   console.log('%c___ datachannel ____', 'background: blue');
+      // });
 
       peerConnection.addEventListener('icegatheringstatechange', () => {
         console.log('%c___ icegatheringstatechange ____', 'background: blue');
       });
 
       peerConnection.addEventListener('iceconnectionstatechange', () => {
-        console.log('%c___ datachannel ____', 'background: blue');
+        console.log('%c___ iceconnectionstatechange ____', 'background: blue');
       });
 
       peerConnection.addEventListener('signalingstatechange', () => {
-        console.log('%c___ datachannel ____', 'background: blue');
+        console.log('%c___ signalingstatechange ____', 'background: blue');
       });
+
+      createDataChannel(peerConnection, viewerId);
 
       // 存储连接
       peerConnections.current.set(viewerId, peerConnection);
@@ -133,6 +289,7 @@ export default function MasterScreen() {
         offerToReceiveVideo: true
       });
       await peerConnection.setLocalDescription(offer);
+
 
       if (signalingClientV2.current && sessionIdRef.current) {
         const sendData = {
@@ -274,11 +431,13 @@ export default function MasterScreen() {
         )}
       </View>
       {audioDevices && (
-        <RTCView
-          streamURL={audioDevices.toURL()}
-          style={styles.audioStream}
-          objectFit="cover"
-        />
+        <>
+          <RTCView
+            streamURL={audioDevices.toURL()}
+            style={styles.audioStream}
+            objectFit="cover"
+          />
+        </>
       )}
     </>
   );

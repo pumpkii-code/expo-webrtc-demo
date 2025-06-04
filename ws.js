@@ -141,6 +141,20 @@ const formatMessage = (eventName, data, ws) => {
       };
       break;
 
+    case '__code_rate':
+      formatData = {
+        eventName: '__code_rate',
+        data: {
+          from: from,
+          messageId: messageId,
+          sessionId: sessionId,
+          sessionType: sessionType,
+          to: to,
+          bitrate: data.bitrate,
+        },
+      };
+      break;
+
     default:
       console.warn('未知事件', eventName);
       break;

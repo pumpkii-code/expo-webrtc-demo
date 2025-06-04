@@ -183,6 +183,10 @@ export class SignalingClientV2 {
           this.callbacks.onClientIceCandidate?.(message.data);
           break;
 
+        case '__code_rate':
+          this.callbacks.onChangeBitrate?.(message.data);
+          break;
+
         case '_ping':
           break;
 
@@ -339,6 +343,18 @@ export class SignalingClientV2 {
         messageId: this._generateMessageId(),
         sdp: sdp,
         type: answerType, // e.g., "answer"
+      },
+    };
+    this._sendMessage(message);
+  }
+
+  public sendChangeBitrate(bitrate: number, peerId: string, sessionId: string) {
+    const message: SignalPostMessage = {
+      eventName: '__code_rate',
+      data: {
+        ...this._buildBaseMessageData(peerId, sessionId),
+        messageId: this._generateMessageId(),
+        bitrate: bitrate,
       },
     };
     this._sendMessage(message);

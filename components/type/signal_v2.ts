@@ -35,6 +35,10 @@ export interface IcePostData {
   label?: string | number;
 }
 
+export interface BitrateData {
+  bitrate: number;
+}
+
 export type SignalPostMessage =
   | {
       eventName: '__connectto';
@@ -55,6 +59,10 @@ export type SignalPostMessage =
   | {
       eventName: '__disconnected';
       data: BaseMessageData;
+    }
+  | {
+      eventName: '__code_rate';
+      data: BaseMessageData & BitrateData;
     }
   | {
       eventName: '__offer';
@@ -161,6 +169,9 @@ export interface SignalingCallbacks {
     sessionId: string
   ) => void;
 
+  // 修改码率
+  onChangeBitrate?: (data: BaseMessageData & BitrateData) => void;
+
   // When the peer actively disconnects the session (PDF pg 10, device initiated _session_disconnected)
   onSessionDisconnected?: (
     message: string | undefined,
@@ -183,4 +194,10 @@ export interface CallOptions {
   user?: string;
   pwd?: string;
   iceServers?: string;
+}
+
+export interface RTCDataChannelSendMessageProps {
+  type: string;
+  data: string;
+  targetViewerId?: string;
 }

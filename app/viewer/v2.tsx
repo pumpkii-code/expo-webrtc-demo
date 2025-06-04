@@ -115,6 +115,10 @@ export default function ViewerScreen() {
         onCreateAnswer={(answer) => {
           signalingClientV2.current?.sendAnswer(answer.sdp, answer.type, peerId, sessionIdRef.current);
         }}
+        sendChangeBitrate={(bitrate) => {
+          console.log('___1000_1 收到 onChangeBitrate 事件', bitrate);
+          signalingClientV2.current?.sendChangeBitrate(bitrate, peerId, sessionIdRef.current);
+        }}
         // onCreateOffer={(offer) => {
         //   const sendData = {
         //     sdp: offer.sdp,
@@ -124,6 +128,7 @@ export default function ViewerScreen() {
         //   }
         //   signalingClientV2.current?.sendOffer(sendData);
         // }}
+        viewerId={sessionIdRef.current}
         candidate={candidate}
         rtcConfig={rtcConfig}
         sdp={sdp}
