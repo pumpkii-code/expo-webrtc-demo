@@ -173,6 +173,22 @@ export default function MasterScreen() {
     }
   };
 
+  useEffect(() => {
+    let webrtcInfoIntervalId: number;
+    if (dataChannels) {
+      webrtcInfoIntervalId = setInterval(() => {
+        sendMessage({
+          type: 'webrtcInfo',
+          data: JSON.stringify({
+            connectedNumber: peerConnections.current.size,
+          }),
+        })
+      }, 5000);
+    }
+
+    return () => clearInterval(webrtcInfoIntervalId);
+  }, [])
+
   // 初始化摄像头
   const setupCamera = async () => {
     try {
@@ -270,7 +286,6 @@ export default function MasterScreen() {
       return null;
     }
   };
-
 
   // 创建并发送 offer
   const createAndSendOffer = async (viewerId: string, stream?: MediaStream) => {
@@ -405,6 +420,17 @@ export default function MasterScreen() {
     };
     startBroadcasting();
     return () => {
+      dataChannels.forEach(channel => {
+        if (channel.readyState !== 'closed') {
+          channel.close();
+        }
+        channel.removeEventListener('open', handleDataChannelOpen);
+        channel.removeEventListener('message', handleDataChannelMessage);
+        channel.removeEventListener('error', handleDataChannelError);
+        channel.removeEventListener('close', handleDataChannelClose);
+      });
+      // 清空数据通道 Map
+      setDataChannels(new Map());
       cleanup();
       InCallManager.stop();
     }

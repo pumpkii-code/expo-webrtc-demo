@@ -25,7 +25,6 @@ export default function SetBitrateButton({ sendChangeBitrate, currentBitrate }: 
   const handleBitrateChange = (bitrate: number) => {
     setOldValue(selectedBitrate)
     setSelectedBitrate(bitrate);
-    console.log('_____10001', selectedBitrate, oldValue)
     sendChangeBitrate({
       type: 'changeBitrate',
       data: JSON.stringify({
@@ -64,7 +63,6 @@ export default function SetBitrateButton({ sendChangeBitrate, currentBitrate }: 
   useEffect(() => {
     // 初始化时设置初始码率
     if (currentBitrate !== selectedBitrate) {
-      console.log('12341241243', currentBitrate, selectedBitrate);
       setSelectedBitrate(oldValue);
       Alert.alert('码率设置失败，请重试');
     }

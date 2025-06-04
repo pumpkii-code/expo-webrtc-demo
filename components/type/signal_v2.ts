@@ -201,3 +201,49 @@ export interface RTCDataChannelSendMessageProps {
   data: string;
   targetViewerId?: string;
 }
+
+export type RTCStatsArray = Array<RTCStatsProps>;
+
+export type RTCStatsCandidatePairProps = {
+  availableOutgoingBitrate: number;
+  nominated: 1 | 0;
+  state: 'succeeded';
+  localCandidateId: string;
+  remoteCandidateId: string;
+  id: string;
+};
+
+export type RTCStatsCandidatePair = {
+  type: 'candidate-pair';
+} & RTCStatsCandidatePairProps;
+
+export type RTCStatsGoogCandidatePair = {
+  type: 'googCandidatePair';
+} & RTCStatsCandidatePairProps;
+
+export type RTCStatsLocalCandidate = {
+  type: 'local-candidate';
+  candidateType: string;
+  id: string;
+};
+
+export type RTCStatsInboundRTP = {
+  type: 'inbound-rtp';
+  kind: 'video';
+  bytesReceived: number;
+  framesDecoded: number;
+  id: string;
+};
+
+export type RTCStatsRemoteCandidate = {
+  type: 'remote-candidate';
+  candidateType: string;
+  id: string;
+};
+
+export type RTCStatsProps =
+  | RTCStatsCandidatePair
+  | RTCStatsGoogCandidatePair
+  | RTCStatsLocalCandidate
+  | RTCStatsInboundRTP
+  | RTCStatsRemoteCandidate;

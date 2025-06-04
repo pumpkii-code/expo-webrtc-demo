@@ -1,15 +1,21 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Text, StyleSheet } from 'react-native';
 import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, MediaStreamTrack, mediaDevices } from 'react-native-webrtc';
+import { RTCStatsArray, RTCStatsCandidatePair, RTCStatsGoogCandidatePair } from "../type/signal_v2";
 
 interface WebRTCInfoProps {
   RTCPeerConnection: RTCPeerConnection | null;
+  connectedNumber: number;
 }
 
-export default function WebRTCConnectInfo({ RTCPeerConnection }: WebRTCInfoProps) {
+const DEFAULT_TIMEOUT = 5000;
+
+export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }: WebRTCInfoProps) {
   // 新增状态用于存储带宽和FPS
   const [currentBitrateKbps, setCurrentBitrateKbps] = useState<number>(0);
   const [currentFps, setCurrentFps] = useState<number>(0);
+  const [currentRemoteMode, setCurrentRemoteMode] = useState<string>(''); // 新增状态用于存储连接模式 inf
+  const [currentLoaclMode, setCurrentLoaclMode] = useState<string>(''); // 新增状态用于存储连接模式 inf
 
   // 用于存储上一次的统计数据
   const lastBytesReceived = useRef<number>(0);
@@ -23,21 +29,71 @@ export default function WebRTCConnectInfo({ RTCPeerConnection }: WebRTCInfoProps
       if (!RTCPeerConnection) return;
 
       try {
-        const stats = await RTCPeerConnection?.getStats();
+        const stats = await RTCPeerConnection?.getStats() as RTCStatsArray;
+        let activeCandidatePair: RTCStatsCandidatePair | RTCStatsGoogCandidatePair | undefined
         let totalBytesReceived = 0;
         let totalFramesDecoded = 0;
 
-        stats.forEach((report: { type: string; kind: string; bytesReceived: any; framesDecoded: any; }) => {
-          console.log('----001', report.type === 'inbound-rtp', report.kind === 'video', report);
+        stats.forEach((report) => {
           if (report.type === 'inbound-rtp' && report.kind === 'video') {
             totalBytesReceived += report.bytesReceived || 0;
             totalFramesDecoded += report.framesDecoded || 0;
-            console.log(`Received ${report.bytesReceived} bytes in ${report.framesDecoded} frames`);
+          }
+
+          // 'googCandidatePair' 是旧的 Chrome 实现，标准的是 'candidate-pair'
+          if (report.type === 'candidate-pair' || report.type === 'googCandidatePair') {
+            // 'succeeded' 意味着这个候选者对被用于数据传输
+            // 'nominated: true' 也表示这个是被选中的
+            if (report.state === 'succeeded' && report.nominated === 1) {
+              activeCandidatePair = report;
+            }
+            // 有些实现可能只有 state: 'succeeded'
+            // if (report.state === 'succeeded' && !activeCandidatePair) {
+            //   activeCandidatePair = report;
+            // }
           }
         });
 
+        if (activeCandidatePair) {
+          const localCandidateId = activeCandidatePair.localCandidateId;
+          const remoteCandidateId = activeCandidatePair.remoteCandidateId;
+
+          let localCandidateType = 'unknown';
+          let remoteCandidateType = 'unknown';
+
+          stats.forEach(report => {
+            if (report.id === localCandidateId) {
+              localCandidateType = 'candidateType' in report ? report?.candidateType : report.type; // candidateType 是标准字段
+              setCurrentLoaclMode(localCandidateType)
+            }
+            if (report.id === remoteCandidateId) {
+              remoteCandidateType = 'candidateType' in report ? report?.candidateType : report.type;
+              setCurrentRemoteMode(remoteCandidateType)
+            }
+          });
+
+          // console.log('Active Candidate Pair (from getStats):');
+          // console.log('Local candidate type:', localCandidateType);
+          // console.log('Remote candidate type:', remoteCandidateType);
+          // activeCandidatePair 中也可能有 IP 地址等信息，如 activeCandidatePair.remoteAddress
+
+          if (remoteCandidateType === 'host') {
+            // console.log('Connection Mode (from getStats): Host-to-Host (Direct P2P in same network)');
+          } else if (remoteCandidateType === 'srflx' || remoteCandidateType === 'serverreflexive') {
+            // console.log('Connection Mode (from getStats): Server Reflexive (P2P via STUN)');
+          } else if (remoteCandidateType === 'prflx' || remoteCandidateType === 'peerreflexive') {
+            // console.log('Connection Mode (from getStats): Peer Reflexive (P2P via STUN, NAT-to-NAT)');
+          } else if (remoteCandidateType === 'relay' || remoteCandidateType === 'relayed') {
+            // console.log('Connection Mode (from getStats): Relayed (via TURN server)');
+          } else {
+            // console.log('Connection Mode (from getStats): Could not determine precisely or other P2P type.');
+          }
+        } else {
+          console.warn('No active (succeeded and nominated) candidate pair found in stats.');
+        }
+
         const currentTime = Date.now();
-        console.log(lastTimestamp.current !== 0, currentTime > lastTimestamp.current, stats)
+        // console.log(lastTimestamp.current !== 0, currentTime > lastTimestamp.current, stats)
         if (lastTimestamp.current !== 0 && currentTime > lastTimestamp.current) {
           const timeDiffSeconds = (currentTime - lastTimestamp.current) / 1000;
 
@@ -62,7 +118,7 @@ export default function WebRTCConnectInfo({ RTCPeerConnection }: WebRTCInfoProps
     };
 
     // 每秒收集一次统计数据
-    const intervalId = setInterval(collectStats, 1000);
+    const intervalId = setInterval(collectStats, DEFAULT_TIMEOUT);
 
     return () => clearInterval(intervalId);
   }, []);
@@ -81,6 +137,8 @@ export default function WebRTCConnectInfo({ RTCPeerConnection }: WebRTCInfoProps
     <>
       <Text style={styles.statsText}>Bitrate: {currentBitrateKbps.toFixed(2)} kbps</Text>
       <Text style={styles.statsText}>FPS: {currentFps.toFixed(2)}</Text>
+      <Text style={styles.statsText}>Mode: {currentLoaclMode + ' / ' + currentRemoteMode}</Text>
+      <Text style={styles.statsText}>Num: {connectedNumber}</Text>
     </>
   )
 }

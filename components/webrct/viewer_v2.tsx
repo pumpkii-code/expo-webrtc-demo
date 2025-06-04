@@ -48,6 +48,9 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   const deviceVideoTrackRef = useRef<MediaStreamTrack[] | null>(null);
   const [isTakingShot, setIsTakingShot] = useState(false);
 
+  // 连接人数
+  const [connectedNumber, setConnectedNumber] = useState(0);
+
   // 新增状态用于存储截图的 ViewShot 实例
   const viewShotRef = useRef<ViewShot>(null);
   const [screenshotUri, setScreenshotUri] = useState<string | null>(null);
@@ -168,6 +171,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
         break;
 
       case 'webrtcInfo':
+        setConnectedNumber(data.connectedNumber);
         console.log('%c_____8.4____ 收到 webrtcInfo 事件', 'background-color: chartreuse;', message);
         break;
 
@@ -398,7 +402,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
           </ViewShot>
           {/* 显示带宽和FPS */}
           <View style={styles.statsContainer}>
-            <WebRTCConnectInfo RTCPeerConnection={webrtcClient.current} />
+            <WebRTCConnectInfo RTCPeerConnection={webrtcClient.current} connectedNumber={connectedNumber} />
           </View>
           {/* 绝对定位按钮区域 */}
           <View style={styles.buttonContainer}>
