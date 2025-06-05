@@ -25,15 +25,20 @@ export default function ViewerScreen() {
   const [connected, setConnected] = useState(false);
   // const webrtcClient = useRef<RTCPeerConnection | null>(null);
   const sessionIdRef = useRef(newGuid());
+  const viewerId = useRef(newGuid());
   const [sdp, setSdp] = useState<string>('');
   const [candidate, setCandidate] = useState<string>('');
 
   // const [isOfferReady,setiIsOfferReady] = useState(false);
   const [rtcConfig, setRtcConfig] = useState<RTCConfiguration>();
 
+  useEffect(() => {
+    console.log('%c________ sessionIdRef.current', 'background:yellow', viewerId.current)
+  }, [viewerId.current]);
+
   const connectSignaling = (serverUrl: string) => {
     console.log('[VIEWER] 开始连接信令服务器');
-    signalingClientV2.current = new SignalingClientV2(serverUrl, newGuid());
+    signalingClientV2.current = new SignalingClientV2(serverUrl, viewerId.current);
 
     // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
     const source = 'MainStream';
@@ -79,21 +84,13 @@ export default function ViewerScreen() {
   }
 
   useEffect(() => {
-
-  }, []);
-
-
-  useEffect(() => {
     connectSignaling(wsUrl);
     return () => {
       if (signalingClientV2.current) {
         signalingClientV2.current.disconnect();
       }
     };
-  }, [])
-
-
-
+  }, []);
 
   if (!rtcConfig || !connected) {
     return (
@@ -128,7 +125,7 @@ export default function ViewerScreen() {
         //   }
         //   signalingClientV2.current?.sendOffer(sendData);
         // }}
-        viewerId={sessionIdRef.current}
+        viewerId={viewerId.current}
         candidate={candidate}
         rtcConfig={rtcConfig}
         sdp={sdp}

@@ -294,6 +294,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   }, [candidate])
 
   useEffect(() => {
+    console.log('%c_____1___ 收到 viewerId___', 'background-color: red; color: white', viewerId);
     setError(null);
     initWebrtcClient(rtcConfig);
     initWebrtcClientAsync();
