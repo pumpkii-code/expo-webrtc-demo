@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react"
 import { SignalingClientV2 } from '@/lib/signal_v2';
 import { newGuid } from "@/lib/util";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { StatusBar } from "expo-status-bar";
 
 
 // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
@@ -105,6 +106,8 @@ export default function ViewerScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar hidden />
+
       <PDRTCView
         onIcecandidate={(candidate) => {
           signalingClientV2.current?.clientSendIceCandidate(candidate, peerId, sessionIdRef.current);

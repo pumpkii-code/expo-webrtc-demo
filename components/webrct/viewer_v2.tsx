@@ -354,7 +354,10 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
 
   useEffect(() => {
     try {
-      InCallManager.start({ media: 'audio' });
+      InCallManager.start({
+        media: 'audio',
+        auto: false,  // 禁用自动接近传感器管理
+      });
       InCallManager.setForceSpeakerphoneOn(true);
       console.log('扬声器已打开 (手动测试)');
     } catch (e) {
