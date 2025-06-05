@@ -42,10 +42,12 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
 
           // 'googCandidatePair' 是旧的 Chrome 实现，标准的是 'candidate-pair'
           if (report.type === 'candidate-pair' || report.type === 'googCandidatePair') {
+            // console.log('%c_____report', 'background:aquamarine', report)
             // 'succeeded' 意味着这个候选者对被用于数据传输
             // 'nominated: true' 也表示这个是被选中的
-            if (report.state === 'succeeded' && report.nominated === 1) {
+            if (report.state === 'succeeded' && (report.nominated === 1 || report.nominated === true)) {
               activeCandidatePair = report;
+              // console.log('%c_____successed get activeCandidatePair', 'background:aquamarine', activeCandidatePair)
             }
             // 有些实现可能只有 state: 'succeeded'
             // if (report.state === 'succeeded' && !activeCandidatePair) {
@@ -118,6 +120,7 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
     };
 
     // 每秒收集一次统计数据
+    collectStats();
     const intervalId = setInterval(collectStats, DEFAULT_TIMEOUT);
 
     return () => clearInterval(intervalId);

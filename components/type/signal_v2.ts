@@ -206,7 +206,7 @@ export type RTCStatsArray = Array<RTCStatsProps>;
 
 export type RTCStatsCandidatePairProps = {
   availableOutgoingBitrate: number;
-  nominated: 1 | 0;
+  nominated: 1 | 0 | boolean;
   state: 'succeeded';
   localCandidateId: string;
   remoteCandidateId: string;
