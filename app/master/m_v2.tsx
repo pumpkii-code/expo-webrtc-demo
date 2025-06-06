@@ -35,7 +35,6 @@ export default function MasterScreen() {
   const webrtcInfoIntervalId = useRef<number | null>(null);
 
   const changeBitrate = (data: { bitrate: number }, currentId: string) => {
-    console.log('收到切换码率请求', data);
 
     // 确保 data 包含有效的码率值
     if (!data || typeof data.bitrate !== 'number') {
@@ -48,7 +47,6 @@ export default function MasterScreen() {
     // 遍历所有活跃的对等连接
     peerConnections.current.forEach((pc, viewerId) => {
       // 获取所有发送器
-      console.log(viewerId, currentId)
       if (viewerId !== currentId) return;
       const senders = pc.getSenders();
 
@@ -110,7 +108,6 @@ export default function MasterScreen() {
   }
 
   const handleDataChannelMessage = (event: MessageEvent<'message'>) => {
-    console.log('%c_____Received message from viewer:', 'background:chartreuse', event.data);
     const data = event.data as string;
     const message = JSON.parse(data);
 
@@ -128,16 +125,15 @@ export default function MasterScreen() {
     console.error('Data channel error:', event);
   };
 
-  const removeDataChannelListeners = (dataChannel: RTCDataChannel, viewerId: string) => {
-    console.log('%c_____删除 channel', 'background: red', viewerId, dataChannel);
-    dataChannel.removeEventListener('open', handleDataChannelOpen);
-    dataChannel.removeEventListener('message', handleDataChannelMessage);
-    dataChannel.removeEventListener('error', handleDataChannelError);
-    dataChannel.removeEventListener('close', handleDataChannelClose);
+  // const removeDataChannelListeners = (dataChannel: RTCDataChannel, viewerId: string) => {
+  //   dataChannel.removeEventListener('open', handleDataChannelOpen);
+  //   dataChannel.removeEventListener('message', handleDataChannelMessage);
+  //   dataChannel.removeEventListener('error', handleDataChannelError);
+  //   dataChannel.removeEventListener('close', handleDataChannelClose);
 
-    dataChannels.delete(viewerId);
+  //   dataChannels.delete(viewerId);
 
-  }
+  // }
 
   const handleDataChannelClose = (event: RTCDataChannelEvent<'close'>) => {
     console.log('Data channel closed:', event.channel);
@@ -147,7 +143,6 @@ export default function MasterScreen() {
     // 添加数据通道的方法
     const set = (viewerId: string, dataChannel: RTCDataChannel) => {
       dataChannelsRef.current.set(viewerId, dataChannel);
-      console.log(`Data channel added for viewer: ${viewerId}`);
       dataChannel.addEventListener('open', handleDataChannelOpen);
       dataChannel.addEventListener('message', handleDataChannelMessage);
       dataChannel.addEventListener('error', handleDataChannelError);
@@ -261,12 +256,11 @@ export default function MasterScreen() {
       maxRetransmits: 3 // 重传次数
     });
 
-    console.log('%c___创建 channel', 'background: aquamarine', dataChannel);
 
-    dataChannel.addEventListener('open', handleDataChannelOpen);
-    dataChannel.addEventListener('message', handleDataChannelMessage);
-    dataChannel.addEventListener('error', handleDataChannelError);
-    dataChannel.addEventListener('close', handleDataChannelClose);
+    // dataChannel.addEventListener('open', handleDataChannelOpen);
+    // dataChannel.addEventListener('message', handleDataChannelMessage);
+    // dataChannel.addEventListener('error', handleDataChannelError);
+    // dataChannel.addEventListener('close', handleDataChannelClose);
 
     // 保存数据通道引用
     dataChannels.set(viewerId, dataChannel);
@@ -293,43 +287,12 @@ export default function MasterScreen() {
     } else {
       // 广播给所有观众
       dataChannels.getAll().forEach((dataChannel, viewerId) => {
-        console.log('%c_____发送消息给所有观众', 'background: antiquewhite', dataChannel, viewerId);
         if (dataChannel.readyState === 'open') {
           dataChannel.send(JSON.stringify(message));
         }
       });
     }
   };
-
-  useEffect(() => {
-    console.log('%c_____useEffect dataChannelsRef.current.size', 'background:yellow', dataChannelsRef.current.size);
-    if (dataChannels.getAll().size > 0) {
-      // 如果已经有定时器在运行，先清除它
-      if (webrtcInfoIntervalId.current) {
-        clearInterval(webrtcInfoIntervalId.current);
-      }
-      webrtcInfoIntervalId.current = setInterval(() => {
-        sendMessage({
-          type: 'webrtcInfo',
-          data: JSON.stringify({
-            connectedNumber: peerConnections.current.size,
-          }),
-        });
-      }, 5000);
-    } else {
-      if (webrtcInfoIntervalId.current) {
-        clearInterval(webrtcInfoIntervalId.current);
-        webrtcInfoIntervalId.current = null;
-      }
-    }
-
-    return () => {
-      if (webrtcInfoIntervalId.current) {
-        clearInterval(webrtcInfoIntervalId.current);
-        webrtcInfoIntervalId.current = null;
-      }
-    }
-  }, [dataChannelsRef.current.size])
 
   // 初始化摄像头
   const setupCamera = async () => {
@@ -370,22 +333,26 @@ export default function MasterScreen() {
         }
         parameters.encodings[0].maxBitrate = 2500000;
         sender.setParameters(parameters)
-          .then(() => console.log('设置初始码率成功: 2500000'))
+          .then(() => {
+            // console.log('设置初始码率成功: 2500000')
+          })
           .catch(err => console.error('设置初始码率失败:', err));
       });
 
       // 处理 ICE candidate
       peerConnection.addEventListener('icecandidate', (event) => {
         if (event.candidate && sessionIdRef.current) {
-          console.log(`[MASTER] 发送 ICE candidate 到观众 ${viewerId}:`, event);
           signalingClientV2.current?.deviceSendIceCandidate(JSON.stringify(event.candidate), viewerId, sessionIdRef.current);
         } else {
           console.log(`[MASTER] 观众 ${viewerId} 的 ICE candidate 收集完成`);
         }
       });
 
+      peerConnection.addEventListener('negotiationneeded', async (e) => {
+        console.log(`%c_______negotiationneeded 变化`, 'background:yellow', e);
+      });
+
       peerConnection.addEventListener('track', (event) => {
-        console.log(`%c_____[MASTER] 收到观众 ${viewerId} 的媒体流___`, 'background: red');
         setAudioDevices(event.streams[0]);
       });
 
@@ -394,15 +361,16 @@ export default function MasterScreen() {
         const state = peerConnection.connectionState;
         console.log(`[MASTER] 与观众 ${viewerId} 的连接状态变化:`, state);
         if (state === 'failed' || state === 'closed' || state === 'disconnected') {
-          console.log(`[MASTER] 与观众 ${viewerId} 的连接已断开`);
+          // console.log(`[MASTER] 与观众 ${viewerId} 的连接已断开`);
           if (dataChannels.get(viewerId)) {
-            const channel = dataChannels.get(viewerId) as RTCDataChannel;
-            removeDataChannelListeners(channel, viewerId);
+            // const channel = dataChannels.get(viewerId) as RTCDataChannel;
+            // removeDataChannelListeners(channel, viewerId);
+            dataChannels.delete(viewerId);
           }
           peerConnections.current.delete(viewerId);
         }
         if (state === 'connected') {
-          console.log(`[MASTER] 与观众 ${viewerId} 的连接已建立`);
+          // console.log(`[MASTER] 与观众 ${viewerId} 的连接已建立`);
         }
       });
 
@@ -447,7 +415,7 @@ export default function MasterScreen() {
       console.log(`[MASTER] 为观众 ${viewerId} 创建 offer...`);
       const offer = await peerConnection.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: true
+        offerToReceiveVideo: true,
       });
       await peerConnection.setLocalDescription(offer);
 

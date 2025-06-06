@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { View, Text, StyleSheet, ActivityIndicator, Button, Platform, Alert } from "react-native";
-import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, MediaStreamTrack, mediaDevices } from 'react-native-webrtc';
+import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, MediaStreamTrack } from 'react-native-webrtc';
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
 import type RTCTrackEvent from 'react-native-webrtc/lib/typescript/RTCTrackEvent.d.ts'
 import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
 import type RTCIceCandidateEvent from 'react-native-webrtc/lib/typescript/RTCIceCandidateEvent.d.ts'
-import InCallManager from 'react-native-incall-manager';
 import AudioButton from "@/components/menu/audio-button";
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
@@ -14,6 +13,7 @@ import RecordButton from "@/components/menu/record";
 import SetBitrateButton from '@/components/menu/set-bitrate'; // 引入导出的 Ref 类型
 import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
 import WebRTCConnectInfo from "@/components/menu/webrtc-info";
+import AudioStreamTrackBtn from "../menu/get-audio-stream";
 
 interface ITestComponentProps {
   rtcConfig: RTCConfiguration;
@@ -58,42 +58,35 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   // 新增状态用于存储当前的码率
   const [bitrate, setBitrate] = useState<number>(2500000);
 
-  // 获取音频
-  const getClientAudio = async () => {
-    console.log('%c_____9.2___ 尝试添加音频', 'background-color: black; color: white');
-    try {
-      const audioStream = await mediaDevices.getUserMedia({
-        audio: true,
-        // video: {
-        //   facingMode: 'user',
-        //   width: { ideal: 1280 },
-        //   height: { ideal: 720 },
-        // }
-        video: false
-      });
-      console.log('%c_____9.3___ 尝试添加音频', 'background-color: black; color: white', audioStream);
-      setAudioStream(audioStream)
-      return audioStream;
-    } catch (error) {
-      console.error('麦克风获取失败:', error);
-    }
-  };
+  // // 获取音频
+  // const getClientAudio = async () => {
+  //   try {
+  //     const audioStream = await mediaDevices.getUserMedia({
+  //       audio: true,
+  //       // video: {
+  //       //   facingMode: 'user',
+  //       //   width: { ideal: 1280 },
+  //       //   height: { ideal: 720 },
+  //       // }
+  //       video: false
+  //     });
+  //     setAudioStream(audioStream)
+  //     return audioStream;
+  //   } catch (error) {
+  //     console.error('麦克风获取失败:', error);
+  //   }
+  // };
 
-  const tryAddAudio = async () => {
-    console.log('%c_____9.1___ 尝试添加音频', 'background-color: black; color: white');
-    const audioStream = await getClientAudio();
-    console.log('%c_____9.4___ 尝试添加音频', 'background-color: black; color: white', audioStream, webrtcClient.current);
-    if (audioStream && webrtcClient.current) {
-      console.log('%c_____9.5___ before add track', 'background-color: black; color: white');
-      audioTrackRef.current = audioStream.getAudioTracks();
-      audioTrackRef.current.forEach(track => {
-        track.enabled = false;
-        console.log('%c_____9.5___ after add track', 'background-color: black; color: yellow');
-        webrtcClient.current?.addTrack(track, audioStream);
-        console.log('%c_____9.6___ after add track', 'background-color: black; color: yellow');
-      });
-    }
-  };
+  // const tryAddAudio = async () => {
+  //   const audioStream = await getClientAudio();
+  //   if (audioStream && webrtcClient.current) {
+  //     audioTrackRef.current = audioStream.getAudioTracks();
+  //     audioTrackRef.current.forEach(track => {
+  //       track.enabled = false;
+  //       webrtcClient.current?.addTrack(track, audioStream);
+  //     });
+  //   }
+  // };
 
   const takeScreenshotAndSave = async () => {
     if (isTakingShot || !viewShotRef.current) {
@@ -142,9 +135,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   };
 
   const handleOnTrack = (e: RTCTrackEvent<"track">) => {
-    console.log('%c_____7.4___ 收到 track 事件', 'background-color: black; color: white', e.streams[0]);
     const stream = e.streams[0];
-    console.log('%c______stream___stream', 'background-color: blue', stream)
     deviceVideoTrackRef.current = stream.getAudioTracks();
     deviceVideoTrackRef.current.forEach(track => {
       track.enabled = false;
@@ -153,26 +144,21 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   }
 
   const handleRtcDataChannelMessage = useCallback((event: MessageEvent<"message">) => {
-    console.log('%c_____8.2____ 收到 datachannel 事件', 'background-color: chartreuse;', event);
     const message = JSON.parse(event.data as string);
     const data = JSON.parse(message.data);
     switch (message.type) {
       case 'changeBitrate':
-        console.log('%c_____8.3____ 收到 changeBitrate 事件', 'background-color: chartreuse;', data.type === 'successed', data.bitrate !== undefined, message, data);
         if (data.state === 'successed' && data.bitrate !== undefined) {
           setBitrate(data.bitrate); // 更新 viewer 端的码率状态
           // bitrateButtonRef.current?.handleResult(true, data.bitrate, '码率设置成功');
-          console.log('%c_____8.3.1____ 收到 changeBitrate 事件', 'background-color: chartreuse;', data.bitrate);
         } else if (data.state === 'failed') {
           // bitrateButtonRef.current?.handleResult(false, undefined, data.message || '码率设置失败');
           setBitrate(new Date().getTime());
-          console.log('%c_____8.3.2____ 收到 changeBitrate 事件', 'background-color: chartreuse;', data.bitrate, bitrate);
         }
         break;
 
       case 'webrtcInfo':
         setConnectedNumber(data.connectedNumber);
-        console.log('%c_____8.4____ 收到 webrtcInfo 事件', 'background-color: chartreuse;', message);
         break;
 
       default:
@@ -182,7 +168,6 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   }, [bitrate]);
 
   const handelDataChannel = (dataChannel: RTCDataChannelEvent<"datachannel">) => {
-    console.log('%c_____8.1____ 收到 datachannel 事件', 'background-color: chartreuse;', dataChannel);
     const channel = dataChannel.channel;
     rtcDataChannelRef.current = channel;
     channel?.addEventListener('message', handleRtcDataChannelMessage);
@@ -199,7 +184,6 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   };
 
   const handleIceCandidate = (event: RTCIceCandidateEvent<"icecandidate">) => {
-    console.log('%c___6 收到 icecandidate 事件', 'color:lightblue', event, event.candidate);
     if (event.candidate) {
       const candidate = JSON.stringify(event.candidate);
       onIcecandidate(candidate)
@@ -207,9 +191,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
   }
 
   const handleConnectionStateChange = () => {
-    console.log('%c_____7.5____ 收到 connectionstatechange 事件', 'background-color: black; color: yellow');
     const newState = webrtcClient.current?.connectionState;
-    console.log(`Connection state changed: ${newState}`);
     setConnectionState(newState);
     if (newState === 'connected') {
       console.log(`____WebRTC connection established.`);
@@ -247,7 +229,7 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
     webrtcClient.current = new RTCPeerConnection({
       iceServers: iceservers.iceServers,
     });
-    tryAddAudio();
+    // tryAddAudio();
     try {
       webrtcClient.current?.addEventListener('track', handleOnTrack);
       webrtcClient.current?.addEventListener('datachannel', handelDataChannel);
@@ -267,7 +249,6 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
 
   const initWebrtcClientAsync = async () => {
     await webrtcClient.current?.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: sdp }));
-
     // await webrtcClient.current?.createOffer({
     //   offerToReceiveAudio: true,
     //   offerToReceiveVideo: true
@@ -278,23 +259,20 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
     // });
 
     await webrtcClient.current?.createAnswer().then((answer) => {
-      console.log('___5 创建 answer');
+      console.log('___5______client__:D 创建 answer', answer);
       webrtcClient.current?.setLocalDescription(answer);
       onCreateAnswer(answer);
     });
 
-    console.log('_____A1___ 初始化 webrtcClient', webrtcClient.current?.connectionState);
     setConnectionState(webrtcClient.current?.connectionState); // 初始化状态
   }
 
   useEffect(() => {
     if (!candidate) return;
-    console.log('_____A2___ 收到 addIceCandidate', candidate);
     webrtcClient.current?.addIceCandidate(JSON.parse(candidate));
   }, [candidate])
 
   useEffect(() => {
-    console.log('%c_____1___ 收到 viewerId___', 'background-color: red; color: white', viewerId);
     setError(null);
     initWebrtcClient(rtcConfig);
     initWebrtcClientAsync();
@@ -352,22 +330,6 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
 
   }, [rtcDataChannel]);
 
-  useEffect(() => {
-    try {
-      InCallManager.start({
-        media: 'audio',
-        auto: false,  // 禁用自动接近传感器管理
-      });
-      InCallManager.setForceSpeakerphoneOn(true);
-      console.log('扬声器已打开 (手动测试)');
-    } catch (e) {
-      console.error('手动测试扬声器失败:', e);
-    }
-
-    return () => {
-      InCallManager.stop();
-    }
-  }, [])
 
   const getStatusMessage = () => {
     if (error && connectionState === 'connected') {
@@ -414,13 +376,12 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
               <Button title="截屏" onPress={takeScreenshotAndSave} color="#fff" />
               {/* <Button title="消息" onPress={() => { sendMessage('消息测试') }} color="#fff" /> */}
               {/* <RecordButton videoStream={videoStreamRef.current} /> */}
-              <AudioButton audioTrack={audioTrackRef.current} enableTitle="开启客户端声音" disableTitle="关闭客户端声音" />
+              <AudioStreamTrackBtn enableTitle="开启客户端声音" disableTitle="关闭客户端声音" peerRTCConnect={webrtcClient.current} />
               <AudioButton audioTrack={deviceVideoTrackRef.current} enableTitle="接收设备声音" disableTitle="不接收设备声音" />
               <SetBitrateButton
                 // ref={bitrateButtonRef} // 传递 ref
                 sendChangeBitrate={sendMessage}
                 currentBitrate={bitrate} // 传递当前码率
-
               />
             </View>
           </View>
