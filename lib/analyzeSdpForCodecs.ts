@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 export interface CodecInfo {
   payloadType: string;
-  name: 'H264' | 'H265' | 'HEVC';
+  name: 'H264' | 'H265' | 'HEVC' | 'VP9';
   clockRate: string;
   fmtp?: string; // a=fmtp 参数是可选的
   /**
@@ -103,7 +103,10 @@ export function analyzeSdpForCodecs(sdp: string): CodecInfo[] {
   for (const [pt, codec] of payloadTypeMap.entries()) {
     if (
       codec.name &&
-      (codec.name === 'H264' || codec.name === 'H265' || codec.name === 'HEVC')
+      (codec.name === 'H264' ||
+        codec.name === 'H265' ||
+        codec.name === 'HEVC' ||
+        codec.name === 'VP9')
     ) {
       // 确保关键信息存在，满足 CodecInfo 类型的要求
       if (codec.name && codec.clockRate) {

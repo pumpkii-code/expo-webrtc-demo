@@ -17,6 +17,7 @@ import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
 import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
+import { preferCodec } from '@/lib/change_decode';
 
 const wsUrl = 'ws://192.168.3.65:8910';
 
@@ -417,6 +418,11 @@ export default function MasterScreen() {
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
       });
+
+      // 在设置本地描述前，修改 SDP
+      // offer.sdp = preferCodec(offer.sdp, 'VP9');
+      // offer.sdp = preferCodec(offer.sdp, 'H265');
+
       await peerConnection.setLocalDescription(offer);
 
 

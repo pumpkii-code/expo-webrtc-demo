@@ -22,6 +22,7 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
   const lastBytesReceived = useRef<number>(0);
   const lastTimestamp = useRef<number>(0);
   const lastFramesDecoded = useRef<number>(0);
+  const [activeMiniType, setActiveMiniType] = useState<string>('');
 
   const startStatsCollection = useCallback(() => {
     if (!RTCPeerConnection) return;
@@ -34,26 +35,52 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
         let activeCandidatePair: RTCStatsCandidatePair | RTCStatsGoogCandidatePair | undefined
         let totalBytesReceived = 0;
         let totalFramesDecoded = 0;
+        let activeCodecId = ''; // 存储当前的 active codec id
+        let inboundVideoReport: any = null;
+        const codecReports: { [id: string]: any } = {};
 
         stats.forEach((report) => {
-          // console.log('%c_____report', 'background:aquamarine', report)
           if (report.type === 'inbound-rtp' && report.kind === 'video') {
+            console.log('%c_____report', 'background:aquamarine', report)
             totalBytesReceived += report.bytesReceived || 0;
             totalFramesDecoded += report.framesDecoded || 0;
 
             if (report.bytesReceived && report.bytesReceived > 0) {
               const implementation = report.decoderImplementation
 
-              if (implementation.toLowerCase().includes('google')) {
-                setDecodeType('software')
-              } else if (implementation.toLowerCase().startsWith('omx.') || implementation.toLowerCase().startsWith('c2.')) {
-                // 如果不是 google 的，通常就是硬件厂商提供的
-                setDecodeType('hardware')
-              }
+              if (implementation) {
+                console.log('%c_____report', 'background:red', implementation, typeof report.powerEfficientDecoder === 'boolean', report)
+                if (implementation.toLowerCase().includes('google') || implementation.toLowerCase().includes('libvpx')) {
+                  setDecodeType('software');
 
-              if (implementation.toLowerCase() === 'videotoolbox') {
-                setDecodeType('hardware')
+                } else if (implementation.toLowerCase().startsWith('omx.') || implementation.toLowerCase().startsWith('c2.') || implementation.toLowerCase() === 'videotoolbox') {
+                  setDecodeType('hardware');
+                }
+
+
+              } else {
+                // 如果两个字段都没有，则无法确定
+                setDecodeType('unknown');
               }
+            }
+
+            if (report.packetsReceived && report.packetsReceived > 0) {
+              inboundVideoReport = report;
+            }
+          }
+
+          if (report.type === 'codec') {
+            codecReports[report.id] = report;
+          }
+
+          // 2. 检查我们是否找到了活跃的视频流报告，以及它是否有 codecId
+          if (inboundVideoReport && inboundVideoReport.codecId) {
+            // 3. 使用 inboundVideoReport 的 codecId 从我们自己创建的 codecReports 对象中查找对应的编解码器
+            const activeCodec = codecReports[inboundVideoReport.codecId];
+
+            if (activeCodec && activeCodec.mimeType) {
+              // 4. 返回编解码器的 mimeType，例如 "video/vp9"
+              setActiveMiniType(activeCodec.mimeType);
             }
           }
 
@@ -160,6 +187,7 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
       <Text style={styles.statsText}>Mode: {currentLoaclMode + ' / ' + currentRemoteMode}</Text>
       <Text style={styles.statsText}>Num: {connectedNumber}</Text>
       <Text style={styles.statsText}>Type: {decodeType}</Text>
+      <Text style={styles.statsText}>Type2: {activeMiniType}</Text>
     </>
   )
 }

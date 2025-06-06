@@ -233,7 +233,10 @@ export type RTCStatsInboundRTP = {
   bytesReceived: number;
   framesDecoded: number;
   id: string;
-  decoderImplementation: string;
+  decoderImplementation?: string;
+  packetsReceived?: number;
+  codecId?: string;
+  powerEfficientDecoder?: boolean;
 };
 
 export type RTCStatsRemoteCandidate = {
@@ -242,9 +245,17 @@ export type RTCStatsRemoteCandidate = {
   id: string;
 };
 
+export type RTCStatsCodec = {
+  type: 'codec';
+  mimeType: string;
+  payloadType: number;
+  id: string;
+};
+
 export type RTCStatsProps =
   | RTCStatsCandidatePair
   | RTCStatsGoogCandidatePair
   | RTCStatsLocalCandidate
   | RTCStatsInboundRTP
-  | RTCStatsRemoteCandidate;
+  | RTCStatsRemoteCandidate
+  | RTCStatsCodec;
