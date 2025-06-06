@@ -16,6 +16,7 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
   const [currentFps, setCurrentFps] = useState<number>(0);
   const [currentRemoteMode, setCurrentRemoteMode] = useState<string>(''); // 新增状态用于存储连接模式 inf
   const [currentLoaclMode, setCurrentLoaclMode] = useState<string>(''); // 新增状态用于存储连接模式 inf
+  const [decodeType, setDecodeType] = useState<string>('unknown'); // 新增状态用于存储连接模式 inf
 
   // 用于存储上一次的统计数据
   const lastBytesReceived = useRef<number>(0);
@@ -35,9 +36,25 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
         let totalFramesDecoded = 0;
 
         stats.forEach((report) => {
+          // console.log('%c_____report', 'background:aquamarine', report)
           if (report.type === 'inbound-rtp' && report.kind === 'video') {
             totalBytesReceived += report.bytesReceived || 0;
             totalFramesDecoded += report.framesDecoded || 0;
+
+            if (report.bytesReceived && report.bytesReceived > 0) {
+              const implementation = report.decoderImplementation
+
+              if (implementation.toLowerCase().includes('google')) {
+                setDecodeType('software')
+              } else if (implementation.toLowerCase().startsWith('omx.') || implementation.toLowerCase().startsWith('c2.')) {
+                // 如果不是 google 的，通常就是硬件厂商提供的
+                setDecodeType('hardware')
+              }
+
+              if (implementation.toLowerCase() === 'videotoolbox') {
+                setDecodeType('hardware')
+              }
+            }
           }
 
           // 'googCandidatePair' 是旧的 Chrome 实现，标准的是 'candidate-pair'
@@ -142,6 +159,7 @@ export default function WebRTCConnectInfo({ RTCPeerConnection, connectedNumber }
       <Text style={styles.statsText}>FPS: {currentFps.toFixed(2)}</Text>
       <Text style={styles.statsText}>Mode: {currentLoaclMode + ' / ' + currentRemoteMode}</Text>
       <Text style={styles.statsText}>Num: {connectedNumber}</Text>
+      <Text style={styles.statsText}>Type: {decodeType}</Text>
     </>
   )
 }

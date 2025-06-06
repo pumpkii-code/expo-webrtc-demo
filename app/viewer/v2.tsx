@@ -12,6 +12,7 @@ import { SignalingClientV2 } from '@/lib/signal_v2';
 import { newGuid } from "@/lib/util";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { analyzeSdpForCodecs } from "@/lib/analyzeSdpForCodecs";
 
 
 // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
@@ -43,7 +44,7 @@ export default function ViewerScreen() {
 
     // const peerId = 'RHZL-00-WTSN-9S3D-00000727';
     const source = 'MainStream';
-    const audioEnable = 'recvonly';
+    const audioEnable = 'recvonly'; // sendRecv(发送和接收) sendonly(只发送) recvonly(只接收) inactive(不接收也不发送)
     const videoEnable = 'recvonly';
     const connectmode = 'live';
     const user = 'root';
@@ -73,6 +74,9 @@ export default function ViewerScreen() {
 
         setRtcConfig(iceservers);
         setSdp(data.sdp);
+        const supportedCodecs = analyzeSdpForCodecs(data.sdp);
+
+        console.log('%c_____Supported H.264/H.265 Codecs:', 'background: aqua', { supportedCodecs, sdp: data.sdp });
       },
       onDeviceIceCandidate: (data) => {
         console.log('___1000_1 收到 onCandidate 事件', data);

@@ -233,6 +233,7 @@ export type RTCStatsInboundRTP = {
   bytesReceived: number;
   framesDecoded: number;
   id: string;
+  decoderImplementation: string;
 };
 
 export type RTCStatsRemoteCandidate = {

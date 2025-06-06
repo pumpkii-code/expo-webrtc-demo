@@ -9,11 +9,11 @@ import type RTCIceCandidateEvent from 'react-native-webrtc/lib/typescript/RTCIce
 import AudioButton from "@/components/menu/audio-button";
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
-import RecordButton from "@/components/menu/record";
 import SetBitrateButton from '@/components/menu/set-bitrate'; // 引入导出的 Ref 类型
 import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
 import WebRTCConnectInfo from "@/components/menu/webrtc-info";
 import AudioStreamTrackBtn from "../menu/get-audio-stream";
+import RecordButton from "@/components/menu/record";
 
 interface ITestComponentProps {
   rtcConfig: RTCConfiguration;
