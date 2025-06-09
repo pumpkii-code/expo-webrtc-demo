@@ -19,7 +19,7 @@ import { analyzeSdpForCodecs } from "@/lib/analyzeSdpForCodecs";
 // const peerId = 'RHZL-00-IFJF-779N-00000244';
 // const wsUrl = 'ws://webrtc.qq-kan.com/';
 const peerId = '111';
-const wsUrl = 'ws://192.168.3.65:8910/';
+const wsUrl = 'ws://192.168.3.65:7001';
 
 export default function ViewerScreen() {
   // const [peerId, setUsePeerId] = useState<string>('');

@@ -18,7 +18,7 @@ import { newGuid } from './util';
 
 // interface SignalingMessage {
 
-//   eventName: string;
+//   event: string;
 //   data: BaseMessageData & Record<string, any>;
 // }
 
@@ -45,7 +45,9 @@ export class SignalingClientV2 {
     } else {
       this.serverUrlBase = serverUrlBase;
     }
+
     this.meid = meid;
+    console.log('_____this.meid_____', this.meid);
   }
 
   private _generateMessageId(): string {
@@ -67,7 +69,7 @@ export class SignalingClientV2 {
   private _sendMessage(payload: SignalPostMessage | SignalReceverMessage) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       console.log(
-        '%c______sendmessage......... XD...:  ' + payload.eventName,
+        '%c______sendmessage......... XD...:  ' + payload.event,
         'background-color:green;color:aqua',
 
         payload
@@ -98,7 +100,7 @@ export class SignalingClientV2 {
       this.callbacks = callbacks;
       const fullUrl = `${this.serverUrlBase}${
         this.serverUrlBase.endsWith('/') ? '' : '/'
-      }wswebclient/${this.meid}`;
+      }signaling`; // ${this.meid}
       console.log(`[SignalingClient] Connecting to: ${fullUrl}.........`);
       this.ws = new WebSocket(fullUrl);
 
@@ -144,11 +146,11 @@ export class SignalingClientV2 {
         | SignalReceverMessage
         | SignalPostMessage;
       console.log(
-        `%c__收到websocket 事件_____ :` + message.eventName,
+        `%c__收到websocket 事件_____ :` + message.event,
         'background-color:aqua;',
         message
       );
-      switch (message.eventName) {
+      switch (message.event) {
         // 下面这些全是 设备端 接收到的消息
         case '__call':
           this.callbacks.onCall?.(message.data);
@@ -234,7 +236,7 @@ export class SignalingClientV2 {
    */
   public initiateSession(peerId: string, sessionId: string) {
     const message: SignalPostMessage = {
-      eventName: '__connectto',
+      event: '__connectto',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
@@ -245,7 +247,7 @@ export class SignalingClientV2 {
 
   public registerDevice(peerId: string) {
     const message: SignalReceverMessage = {
-      eventName: '_register',
+      event: '_register',
       data: { peerId },
     };
 
@@ -285,7 +287,7 @@ export class SignalingClientV2 {
     // }
 
     const message: SignalPostMessage = {
-      eventName: '__call',
+      event: '__call',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
@@ -313,7 +315,7 @@ export class SignalingClientV2 {
     } /* for Alexa compatibility */
   ) {
     const message: SignalReceverMessage = {
-      eventName: '_offer',
+      event: '_offer',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
@@ -337,7 +339,7 @@ export class SignalingClientV2 {
     sessionId: string
   ) {
     const message: SignalPostMessage = {
-      eventName: '__answer',
+      event: '__answer',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
@@ -350,7 +352,7 @@ export class SignalingClientV2 {
 
   public sendChangeBitrate(bitrate: number, peerId: string, sessionId: string) {
     const message: SignalPostMessage = {
-      eventName: '__code_rate',
+      event: '__code_rate',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
@@ -373,7 +375,7 @@ export class SignalingClientV2 {
     sessionId: string
   ) {
     const message: SignalPostMessage = {
-      eventName: '__ice_candidate',
+      event: '__ice_candidate',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
@@ -389,7 +391,7 @@ export class SignalingClientV2 {
     sessionId: string
   ) {
     const message: SignalReceverMessage = {
-      eventName: '_ice_candidate',
+      event: '_ice_candidate',
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),
@@ -404,7 +406,7 @@ export class SignalingClientV2 {
    */
   // public postMessage(messageContent: any, peerId: string, sessionId: string) {
   //   const message = {
-  //     eventName: '_post_message',
+  //     event: '_post_message',
   //     data: {
   //       ...this._buildBaseMessageData(peerId, sessionId),
   //       messageId: this._generateMessageId(),
@@ -420,7 +422,7 @@ export class SignalingClientV2 {
    */
   public disconnectSession(peerId: string, sessionId: string) {
     const message: SignalPostMessage = {
-      eventName: '__disconnected', // As per PDF pg 11 for browser-initiated disconnect
+      event: '__disconnected', // As per PDF pg 11 for browser-initiated disconnect
       data: {
         ...this._buildBaseMessageData(peerId, sessionId),
         messageId: this._generateMessageId(),

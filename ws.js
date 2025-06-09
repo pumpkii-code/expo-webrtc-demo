@@ -17,11 +17,11 @@ const connectionsData = {};
 // 存储所有设备端的信息
 const devicesMap = {};
 
-const formatMessage = (eventName, data, ws) => {
+const formatMessage = (event, data, ws) => {
   const { sessionId, messageId, sessionType, from, to } = data;
   let formatData = {};
 
-  switch (eventName) {
+  switch (event) {
     case '__connectto':
       // 存储用户信息
       ws.peerId = from;
@@ -30,7 +30,7 @@ const formatMessage = (eventName, data, ws) => {
       // State： 需要访问的设备号的在线状态：online，offline
       // iceServers：服务器下发的 iceServers 的地址。创建webrtc 使用这个地址创建。并且再后面的 call 命令中发给设备端。
       formatData = {
-        eventName: '_create',
+        event: '_create',
         data: {
           // domainnameiceServers: domainnameiceServers,
           from: to,
@@ -52,7 +52,7 @@ const formatMessage = (eventName, data, ws) => {
       }
       const { audio, datachannel, mode, pwd, source, user, video } = data;
       formatData = {
-        eventName: '__call',
+        event: '__call',
         data: {
           audio: audio,
           datachannel: datachannel,
@@ -75,7 +75,7 @@ const formatMessage = (eventName, data, ws) => {
     case '_offer':
       const {} = data;
       formatData = {
-        eventName: '_offer',
+        event: '_offer',
         data: {
           audio: '',
           datachannel: '',
@@ -100,7 +100,7 @@ const formatMessage = (eventName, data, ws) => {
     case '__answer':
       const { sdp } = data;
       formatData = {
-        eventName: '__answer',
+        event: '__answer',
         data: {
           from: from,
           messageId: messageId,
@@ -115,7 +115,7 @@ const formatMessage = (eventName, data, ws) => {
 
     case '__ice_candidate':
       formatData = {
-        eventName: '__ice_candidate',
+        event: '__ice_candidate',
         data: {
           candidate: data.candidate,
           from: from,
@@ -129,7 +129,7 @@ const formatMessage = (eventName, data, ws) => {
 
     case '_ice_candidate':
       formatData = {
-        eventName: '_ice_candidate',
+        event: '_ice_candidate',
         data: {
           candidate: data.candidate,
           from: from,
@@ -143,7 +143,7 @@ const formatMessage = (eventName, data, ws) => {
 
     case '__code_rate':
       formatData = {
-        eventName: '__code_rate',
+        event: '__code_rate',
         data: {
           from: from,
           messageId: messageId,
@@ -156,7 +156,7 @@ const formatMessage = (eventName, data, ws) => {
       break;
 
     default:
-      console.warn('未知事件', eventName);
+      console.warn('未知事件', event);
       break;
   }
 
@@ -171,11 +171,11 @@ const iceservers = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}',
 
 wss.on('connection', (ws) => {
   ws.on('message', (message) => {
-    const { eventName, data } = JSON.parse(message);
-    console.log('Received message:', eventName);
+    const { event, data } = JSON.parse(message);
+    console.log('Received message:', event);
 
     // 设备端注册 这个是例外, 没有额外的参数
-    if (eventName === '_register') {
+    if (event === '_register') {
       ws.peerId = data.peerId;
       userMap[data.peerId] = ws;
       devicesMap[data.peerId] = {};
@@ -214,7 +214,7 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    const sendData = formatMessage(eventName, data, ws);
+    const sendData = formatMessage(event, data, ws);
 
     if (!sendData) {
       console.error('发送数据为空');
@@ -232,7 +232,7 @@ wss.on('connection', (ws) => {
     }
 
     // 统一转发
-    if (eventName === '__connectto') {
+    if (event === '__connectto') {
       userMap[from].send(JSON.stringify(sendData));
       return;
     } else {
@@ -256,7 +256,7 @@ wss.on('connection', (ws) => {
           if (userMap[client]) {
             userMap[client].send(
               JSON.stringify({
-                eventName: '_offline',
+                event: '_offline',
                 data: {
                   peerId: peerId,
                 },

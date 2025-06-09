@@ -41,31 +41,31 @@ export interface BitrateData {
 
 export type SignalPostMessage =
   | {
-      eventName: '__connectto';
+      event: '__connectto';
       data: BaseMessageData;
     }
   | {
-      eventName: '__call';
+      event: '__call';
       data: BaseMessageData & CallPostData;
     }
   | {
-      eventName: '__ice_candidate';
+      event: '__ice_candidate';
       data: BaseMessageData & IcePostData;
     }
   | {
-      eventName: '__answer';
+      event: '__answer';
       data: BaseMessageData & AnswerPostData;
     }
   | {
-      eventName: '__disconnected';
+      event: '__disconnected';
       data: BaseMessageData;
     }
   | {
-      eventName: '__code_rate';
+      event: '__code_rate';
       data: BaseMessageData & BitrateData;
     }
   | {
-      eventName: '__offer';
+      event: '__offer';
       data: BaseMessageData;
     };
 
@@ -96,49 +96,49 @@ export interface ConnectInfoReceverData {
 }
 
 export interface DiconnectedReceverMessage {
-  eventName: string;
+  event: string;
   data: any;
 }
 
 export type SignalReceverMessage =
   | {
-      eventName: '_create';
+      event: '_create';
       data: BaseMessageData & CreateReceverData;
     }
   | {
-      eventName: '_offer';
+      event: '_offer';
       data: BaseMessageData & OfferReceverData;
     }
   | {
-      eventName: '_ice_candidate';
+      event: '_ice_candidate';
       data: BaseMessageData & IceCandidateReceverData;
     }
   | {
-      eventName: '_ping';
+      event: '_ping';
       data: BaseMessageData & PingReceverData;
     }
   | {
-      eventName: '_connectinfo';
+      event: '_connectinfo';
       data: BaseMessageData & ConnectInfoReceverData;
     }
   | {
-      eventName: '_disconnected';
+      event: '_disconnected';
       data: BaseMessageData & DiconnectedReceverMessage;
     }
   | {
-      eventName: '_register';
+      event: '_register';
       data: {
         peerId: string;
       };
     }
   | {
-      eventName: '_offline';
+      event: '_offline';
       data: {
         peerId: string;
       };
     }
   | {
-      eventName: '__ice_candidate';
+      event: '__ice_candidate';
       data: BaseMessageData & IcePostData;
     };
 

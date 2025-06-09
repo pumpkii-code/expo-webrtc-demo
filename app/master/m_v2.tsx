@@ -19,7 +19,7 @@ import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCData
 import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
 import { preferCodec } from '@/lib/change_decode';
 
-const wsUrl = 'ws://192.168.3.65:8910';
+const wsUrl = 'ws://192.168.3.65:7001';
 
 export default function MasterScreen() {
   const [connected, setConnected] = useState(false);
@@ -454,7 +454,7 @@ export default function MasterScreen() {
       },
 
       onCall: (data) => {
-        console.log('收到呼叫');
+        console.log('收到呼叫', data);
         sessionIdRef.current = data.sessionId;
         createAndSendOffer(data.from, stream);
       },
