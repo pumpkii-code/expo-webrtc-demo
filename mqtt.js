@@ -5,6 +5,20 @@
  * @LastEditTime: 2025-06-11 15:37:18
  * @FilePath: /expo-webrtc-demo/mqtt.js
  */
+
+/**
+ * 运行mosquitto
+docker run \
+  -it \
+  -d \
+  --name my-webrtc-mosquitto \
+  -p 1883:1883 \
+  -p 9001:9001 \
+  -v /Volumes/HIKSEMI/web-test/WebRTC-1/expo-webrtc-demo/mosquitto.conf:/mosquitto/config/mosquitto.conf \
+  -v /Volumes/HIKSEMI/web-test/WebRTC-1/expo-webrtc-demo/data:/mosquitto/data \
+  -v /Volumes/HIKSEMI/web-test/WebRTC-1/expo-webrtc-demo/log:/mosquitto/log \
+  eclipse-mosquitto:latest
+ */
 const mqtt = require('mqtt');
 const port = 1883;
 const brokerUrl = `mqtt://localhost:${port}`;
@@ -29,7 +43,7 @@ const TOPICS = {
   ANSWER: 'webrtc/answer',
   ICE_CANDIDATE: 'webrtc/ice_candidate',
   CODE_RATE: 'webrtc/code_rate',
-  OFFLINE: 'webrtc/offline'
+  OFFLINE: 'webrtc/offline',
 };
 
 const formatMessage = (event, data, clientId) => {
@@ -201,15 +215,15 @@ const sendToUser = (userId, message) => {
 // MQTT 连接成功
 client.on('connect', () => {
   console.log('MQTT broker 连接成功');
-  
+
   // 订阅所有相关主题
-  Object.values(TOPICS).forEach(topic => {
+  Object.values(TOPICS).forEach((topic) => {
     client.subscribe(topic, { qos: 1 });
   });
-  
+
   // 订阅用户主题的通配符
   client.subscribe('webrtc/user/+', { qos: 1 });
-  
+
   console.log('已订阅所有 WebRTC 主题');
 });
 
@@ -345,5 +359,5 @@ module.exports = {
   publishMessage,
   sendToUser,
   handleUserOffline,
-  TOPICS
+  TOPICS,
 };

@@ -53,6 +53,26 @@ export default function RouteScreen() {
       >
         我的直播间v2
       </Link>
+
+      <Link
+        href={{
+          pathname: '/viewer/v3',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        模拟 2
+      </Link>
+
+      <Link
+        href={{
+          pathname: '/master/m_v3',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        我的直播间v3
+      </Link>
     </SafeAreaView>
   );
 }

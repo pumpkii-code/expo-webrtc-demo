@@ -5,6 +5,22 @@
  * @LastEditTime: 2025-05-16 11:59:53
  * @FilePath: /expo-webrtc-demo/app/_layout.tsx
  */
+
+// --- 全局加载所有必要的 Polyfills (最终修正版) ---
+
+// 1. Buffer Polyfill (保持不变)
+import { Buffer } from 'buffer';
+global.Buffer = Buffer;
+
+// 2. process Polyfill (保持不变)
+global.process = require('process/browser');
+
+// 3. 核心修复：为我们创建的 process 对象添加 nextTick 函数
+// mqtt.js 和其依赖的 stream 模块需要这个函数
+global.process.nextTick = require('process/browser').nextTick;
+
+// --- Polyfill 添加结束 ---
+
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -79,6 +95,14 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
+          name="viewer/v3"
+          options={{
+            headerShown: false,
+            orientation: 'landscape',  // 添加这行来强制横屏
+            animation: 'none'
+          }}
+        />
+        <Stack.Screen
           name="viewer/fullscreen"
           options={{
             headerShown: false,
@@ -96,6 +120,14 @@ function RootLayoutNav() {
         />
         <Stack.Screen
           name="master/m_v2"
+          options={{
+            headerShown: false,
+            orientation: 'landscape',  // 添加这行来强制横屏
+            animation: 'none'
+          }}
+        />
+        <Stack.Screen
+          name="master/m_v3"
           options={{
             headerShown: false,
             orientation: 'landscape',  // 添加这行来强制横屏

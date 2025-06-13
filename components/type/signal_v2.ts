@@ -158,7 +158,7 @@ export type SignalReceverMessage =
 export interface SignalingCallbacks {
   onConnected?: () => void;
   onDisconnected?: (reason?: string) => void;
-  onError?: (error: Event | string) => void;
+  onError?: (error: Event | string | Error) => void;
 
   // Called when the server acknowledges _connectto and provides ICE servers
   // This happens in both "Device Initiates Offer" and "Browser Initiates Offer" flows,
