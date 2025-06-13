@@ -26,6 +26,16 @@ export default function RouteScreen() {
 
       <Link
         href={{
+          pathname: '/viewer',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        模拟 1
+      </Link>
+
+      <Link
+        href={{
           pathname: '/viewer/v2',
           params: { serno }
         }}
@@ -36,42 +46,12 @@ export default function RouteScreen() {
 
       <Link
         href={{
-          pathname: '/viewer',
-          params: { serno }
-        }}
-        style={styles.link}
-      >
-        查看直播间
-      </Link>
-
-      <Link
-        href={{
-          pathname: '/viewer/newIndex',
-          params: { serno }
-        }}
-        style={styles.link}
-      >
-        查看直播间(newIndex)
-      </Link>
-
-      <Link
-        href={{
-          pathname: '/master',
-          params: { serno }
-        }}
-        style={styles.link}
-      >
-        我的直播间
-      </Link>
-
-      <Link
-        href={{
           pathname: '/master/m_v2',
           params: { serno }
         }}
         style={styles.link}
       >
-        我的直播间(v2)
+        我的直播间v2
       </Link>
     </SafeAreaView>
   );

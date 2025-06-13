@@ -5,9 +5,32 @@
  * @LastEditTime: 2025-05-15 18:13:55
  * @FilePath: /expo-webrtc-demo/ws.js
  */
+const { timeStamp } = require('console');
+const http = require('http');
 const WebSocket = require('ws');
+
 const port = 8910;
-const wss = new WebSocket.Server({ port });
+
+// NEW: Create an HTTP server
+const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/mio/t1') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    });
+
+    // --- 关键修正 ---
+    // 将 Map 转换为普通对象再进行 JSON 序列化
+    const devicesObject = Object.fromEntries(devicesMap);
+    console.log(JSON.stringify(devicesObject, null, 2));
+    res.end(JSON.stringify(devicesObject, null, 2));
+  } else {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+});
+
+const wss = new WebSocket.Server({ server });
 
 const userMap = {};
 const connections = {
@@ -15,9 +38,11 @@ const connections = {
 };
 const connectionsData = {};
 // 存储所有设备端的信息
-const devicesMap = {};
+const devicesMap = new Map(); // <-- 变化: 初始化为真正的 Map
 
+// ... (formatMessage 函数保持不变)
 const formatMessage = (event, data, ws) => {
+  // ... 此处代码无变化 ...
   const { sessionId, messageId, sessionType, from, to } = data;
   let formatData = {};
 
@@ -162,7 +187,6 @@ const formatMessage = (event, data, ws) => {
 
   return formatData;
 };
-
 const iceservers = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}',
   iceServers =
     '{"iceServers":[{"urls":"stun:stun.l.google.com:19302","username":"qq-kan","credential":"1544115907"}],"iceTransportPolicy":"all","iceCandidatePoolSize":"0"}',
@@ -170,18 +194,17 @@ const iceservers = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}',
     '{"iceServers":[{"urls":"stun:stun.l.google.com:19302","username":"qq-kan","credential":"1544115907"}],"iceTransportPolicy":"all","iceCandidatePoolSize":"0"}';
 
 wss.on('connection', (ws) => {
+  console.log('connection');
   ws.on('message', (message) => {
     const { event, data } = JSON.parse(message);
     console.log('Received message:', event);
 
-    // 设备端注册 这个是例外, 没有额外的参数
     if (event === '_register') {
       ws.peerId = data.peerId;
       userMap[data.peerId] = ws;
-      devicesMap[data.peerId] = {};
-      console.log('设备端注册成功');
+      devicesMap.set(data.peerId, {}); // <-- 变化: 使用 .set() 方法
+      console.log('设备端注册成功:', data.peerId);
 
-      // 如果有未完成的连接，发送给目标设备
       const waitingViewers = Object.keys(connections).filter(
         (viewerId) => connections[viewerId] === data.peerId
       );
@@ -189,24 +212,35 @@ wss.on('connection', (ws) => {
       console.log('waitingViewers', data.peerId, waitingViewers);
 
       waitingViewers.forEach((viewerId) => {
-        devicesMap[data.peerId][viewerId] = true;
+        const viewersOfDevice = devicesMap.get(data.peerId); // <-- 变化: 使用 .get() 方法
+        if (viewersOfDevice) {
+          viewersOfDevice[viewerId] = true; // 子对象仍然是普通对象，操作不变
+        }
+
         userMap[viewerId].send(JSON.stringify(connectionsData[viewerId]));
         delete connections[viewerId];
         delete connectionsData[viewerId];
-
-        console.log(
-          '清除所有等待该设备的连接__connections',
-          JSON.stringify(connections)
-        );
-        console.log(
-          '清除所有等待该设备的连接__connectionsData',
-          JSON.stringify(connectionsData)
-        );
       });
       return;
     }
 
-    // 其他事件 是包含这些所有参数的
+    if (event === '__registerViewerId') {
+      ws.peerId = data.viewerId;
+      userMap[data.viewerId] = ws;
+      return;
+    }
+
+    if (event === '__ping') {
+      ws.send(
+        JSON.stringify({
+          event: '_pong',
+          data: { timeStamp: new Date().getTime() },
+        })
+      );
+      return;
+    }
+
+    // ... (其他事件处理部分无变化)
     const { sessionId, messageId, sessionType, from, to } = data;
 
     if (!sessionId || !messageId || !sessionType || !from || !to) {
@@ -245,34 +279,52 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    // 清理断开的连接
+    console.log('close+______++:D');
     const peerId = ws.peerId;
-    if (peerId && userMap[peerId]) {
+    if (peerId) {
+      // 简化判断
       console.log(`Peer ${peerId} 断开连接`);
 
-      if (devicesMap[peerId]) {
-        // 通知所有设备端该用户已离线
-        Object.keys(devicesMap[peerId]).forEach((client) => {
-          if (userMap[client]) {
-            userMap[client].send(
-              JSON.stringify({
-                event: '_offline',
-                data: {
-                  peerId: peerId,
-                },
-              })
-            );
-          }
-        });
+      // <-- 变化: 使用 Map 的 API
+      if (devicesMap.has(peerId)) {
+        // 通知所有连接到此设备的用户，该设备已离线
+        const viewers = devicesMap.get(peerId);
+        if (viewers) {
+          Object.keys(viewers).forEach((client) => {
+            if (userMap[client]) {
+              userMap[client].send(
+                JSON.stringify({
+                  event: '_offline',
+                  data: { peerId: peerId },
+                })
+              );
+            }
+          });
+        }
+        // 清理设备
+        devicesMap.delete(peerId);
+        console.log(
+          `Device ${peerId} and its connections cleared from devicesMap.`
+        );
       }
 
       delete userMap[peerId];
-      delete connections[peerId];
-      delete connectionsData[peerId];
-    }
 
-    //如果是用户，则需要从
+      // 清理等待队列中的连接
+      for (const fromId in connections) {
+        if (connections[fromId] === peerId || fromId === peerId) {
+          delete connections[fromId];
+          delete connectionsData[fromId];
+        }
+      }
+    }
   });
 });
 
-console.log('ws____Signaling server running on ws://localhost: ' + port);
+server.listen(port, () => {
+  console.log(`HTTP and WebSocket server running on port: ${port}`);
+  console.log(`- WebSocket endpoint: ws://localhost:${port}`);
+  console.log(
+    `- To query devicesMap, use: GET http://localhost:${port}/devices`
+  );
+});

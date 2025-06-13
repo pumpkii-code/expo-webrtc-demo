@@ -19,13 +19,14 @@ import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCData
 import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
 import { preferCodec } from '@/lib/change_decode';
 
-const wsUrl = 'ws://192.168.3.65:7001';
+const wsUrl = process.env.EXPO_PUBLIC_WS_URL;
 
 export default function MasterScreen() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
   const sessionIdRef = useRef<string | null>(null);
+  const deivceIdRef = useRef<string>(newGuid());
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const localStreamRef = useRef<MediaStream | null>(localStream);
   localStreamRef.current = localStream;
@@ -444,13 +445,13 @@ export default function MasterScreen() {
   // 连接信令服务器
   const connectSignaling = (serverUrl: string, stream: MediaStream) => {
     console.log('开始连接信令服务器');
-    signalingClientV2.current = new SignalingClientV2(serverUrl, newGuid());
+    signalingClientV2.current = new SignalingClientV2(serverUrl, deivceIdRef.current);
 
     signalingClientV2.current.connect({
       onConnected: () => {
         setConnected(true);
         console.log('连接信令服务器成功');
-        signalingClientV2.current?.registerDevice(peerId);
+        signalingClientV2.current?.registerDevice();
       },
 
       onCall: (data) => {
@@ -463,6 +464,7 @@ export default function MasterScreen() {
         console.log('%c____收到回答_____', 'background: yellow', data);
         const peerConnection = peerConnections.current.get(data.from);
         if (peerConnection) {
+          console.log('%c_____peerConnection', 'color: red', { data })
           peerConnection.setRemoteDescription(new RTCSessionDescription({
             sdp: data.sdp,
             type: data.type as RTCSdpType,
@@ -503,7 +505,7 @@ export default function MasterScreen() {
   const startBroadcasting = async () => {
     console.log('[MASTER] 开始推流');
     const stream = await setupCamera();
-    if (stream) {
+    if (stream && wsUrl) {
       connectSignaling(wsUrl, stream);
     }
     return stream
@@ -571,6 +573,7 @@ export default function MasterScreen() {
         )}
         {localStream && (
           <>
+            <Text style={{ color: 'white', backgroundColor: 'black' }}>{deivceIdRef.current}</Text>
             <RTCView
               streamURL={localStream.toURL()}
               style={styles.stream}
