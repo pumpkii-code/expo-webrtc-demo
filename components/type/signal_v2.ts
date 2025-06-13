@@ -7,14 +7,14 @@ export interface BaseMessageData {
 }
 
 export interface CallPostData {
-  audio: 'recvonly';
-  video: 'recvonly';
+  audio: string;
+  video: string;
   datachannel: 'true' | 'false';
   iceservers: string;
   user: string;
-  source: 'MainStream';
+  source: string;
   pwd: string;
-  mode: 'live' | 'play';
+  mode: string;
 }
 
 export interface AnswerPostData {
@@ -44,6 +44,7 @@ export type SignalPostMessage =
       event: '__connectto';
       data: BaseMessageData;
     }
+  | { event: '__registerViewerId'; data: { viewerId: string } }
   | {
       event: '__call';
       data: BaseMessageData & CallPostData;
@@ -67,6 +68,12 @@ export type SignalPostMessage =
   | {
       event: '__offer';
       data: BaseMessageData;
+    }
+  | {
+      event: '__ping';
+      data: {
+        timestamp: number;
+      };
     };
 
 export interface CreateReceverData {
@@ -140,6 +147,12 @@ export type SignalReceverMessage =
   | {
       event: '__ice_candidate';
       data: BaseMessageData & IcePostData;
+    }
+  | {
+      event: '_pong';
+      data: {
+        timestamp: number;
+      };
     };
 
 export interface SignalingCallbacks {

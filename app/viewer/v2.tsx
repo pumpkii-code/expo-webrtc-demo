@@ -19,7 +19,7 @@ import { analyzeSdpForCodecs } from "@/lib/analyzeSdpForCodecs";
 // const peerId = 'RHZL-00-IFJF-779N-00000244';
 // const wsUrl = 'ws://webrtc.qq-kan.com/';
 const peerId = '111';
-const wsUrl = 'ws://192.168.3.65:7001';
+const wsUrl = 'ws://192.168.3.65:8910';
 
 export default function ViewerScreen() {
   // const [peerId, setUsePeerId] = useState<string>('');
@@ -65,7 +65,7 @@ export default function ViewerScreen() {
           pwd,
           datachannelEnable
         } as const;
-        signalingClientV2.current?.sendCall(peerId, sessionIdRef.current, connectmode, source, options);
+        signalingClientV2.current?.sendCall(peerId, sessionIdRef.current, options);
       },
       onOffer: async (data) => {
         console.log('%c_____onOffer____', 'background:yellow', data)
@@ -114,10 +114,10 @@ export default function ViewerScreen() {
 
       <PDRTCView
         onIcecandidate={(candidate) => {
-          signalingClientV2.current?.clientSendIceCandidate(candidate, peerId, sessionIdRef.current);
+          signalingClientV2.current?.clientSendIceCandidate(candidate);
         }}
         onCreateAnswer={(answer) => {
-          signalingClientV2.current?.sendAnswer(answer.sdp, answer.type, peerId, sessionIdRef.current);
+          signalingClientV2.current?.sendAnswer(answer.sdp, answer.type);
         }}
         sendChangeBitrate={(bitrate) => {
           console.log('___1000_1 收到 onChangeBitrate 事件', bitrate);

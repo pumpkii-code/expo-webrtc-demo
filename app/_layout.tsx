@@ -60,13 +60,13 @@ function RootLayoutNav() {
         initialRouteName='home/index'
         screenOptions={{
           headerShown: false,
-          orientation: 'portrait_up'  // 添加这行来强制横屏
+          orientation: 'portrait_up'
         }}>
         <Stack.Screen
           name="viewer/index"
           options={{
             headerShown: false,
-            orientation: 'landscape',  // 添加这行来强制横屏
+            orientation: 'portrait_up',
             animation: 'none'
           }}
         />
@@ -79,7 +79,7 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
-          name="viewer/newIndex"
+          name="viewer/fullscreen"
           options={{
             headerShown: false,
             orientation: 'landscape',  // 添加这行来强制横屏

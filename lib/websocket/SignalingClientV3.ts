@@ -1,40 +1,28 @@
 import type {
   BaseMessageData,
   CallOptions,
+  EventPayloads, // 导入新的事件映射
   SignalPostMessage,
   SignalReceverMessage,
-  SignalingCallbacks,
-} from '@/components/type/signal_v2';
-import { newGuid } from './util';
-
-// Helper for UUID generation (you might want a more robust library like `uuid`)
-// function uuidv4(): string {
-//   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-//     const r = (Math.random() * 16) | 0,
-//       v = c === 'x' ? r : (r & 0x3) | 0x8;
-//     return v.toString(16);
-//   });
-// }
-
-// interface SignalingMessage {
-
-//   event: string;
-//   data: BaseMessageData & Record<string, any>;
-// }
+  CreateEventData,
+  // SignalingCallbacks, // 不再需要这个
+} from '@/types/signal_v3';
+import { newGuid } from '@/lib/util';
 
 const coverIceServers = (config: string): RTCConfiguration => {
   return JSON.parse(config);
 };
 
-// let that: SignalingClientV2;
-
-export class SignalingClientV2 {
+export class SignalingClientV3 {
   private ws: WebSocket | null = null;
   private serverUrlBase: string;
-  public meid: string; // ID of this client
-  private callbacks: SignalingCallbacks = {};
+  public meid: string;
+  // 使用 Map 存储事件监听器，key 是事件名，value 是回调函数数组
+  private listeners: Map<keyof EventPayloads, Array<(data: any) => void>> =
+    new Map();
   private connected: boolean = false;
   private pingInterval: number | null = null;
+  // ... 其他属性保持不变
   private source: string = 'MainStream';
   private audioEnable: string = 'recvonly';
   private videoEnable: string = 'recvonly';
@@ -44,6 +32,7 @@ export class SignalingClientV2 {
   private sessionId: string = '';
 
   constructor(serverUrlBase: string | undefined, meid: string) {
+    // ... constructor 逻辑保持不变
     if (!serverUrlBase) {
       throw new Error('WebSocket URL base is required');
     } else {
@@ -63,9 +52,230 @@ export class SignalingClientV2 {
     } else {
       this.serverUrlBase = serverUrlBase;
     }
-
     this.meid = meid;
     console.log('_____this.meid_____', this.meid);
+  }
+
+  // --- 新增的事件监听方法 ---
+
+  /**
+   * 注册一个事件监听器 (Add Event Listener)
+   * @param event 事件名称
+   * @param callback 回调函数
+   */
+  public on<E extends keyof EventPayloads>(
+    event: E,
+    callback: (data: EventPayloads[E]) => void
+  ): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event)!.push(callback);
+  }
+
+  /**
+   * 移除一个事件监听器 (Remove Event Listener)
+   * @param event 事件名称
+   * @param callback 要移除的回调函数
+   */
+  public off<E extends keyof EventPayloads>(
+    event: E,
+    callback: (data: EventPayloads[E]) => void
+  ): void {
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      const index = eventListeners.indexOf(callback);
+      if (index > -1) {
+        eventListeners.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * 移除一个事件的所有监听器
+   * @param event 事件名称
+   */
+  public removeAllListeners(event?: keyof EventPayloads): void {
+    if (event) {
+      this.listeners.delete(event);
+    } else {
+      this.listeners.clear();
+    }
+  }
+
+  /**
+   * 私有的事件触发器
+   * @param event 事件名称
+   * @param data 传递给回调的数据
+   */
+  private _emit<E extends keyof EventPayloads>(
+    event: E,
+    data: EventPayloads[E]
+  ): void {
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      // 创建一个副本以防止在迭代期间修改数组
+      [...eventListeners].forEach((listener) => {
+        try {
+          listener(data);
+        } catch (error) {
+          console.error(
+            `[SignalingClient] Error in listener for event ':`,
+            error
+          );
+        }
+      });
+    }
+  }
+
+  // --- 修改 connect 方法 ---
+
+  // connect 不再需要 callbacks 参数
+  connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (
+        this.ws &&
+        (this.ws.readyState === WebSocket.OPEN ||
+          this.ws.readyState === WebSocket.CONNECTING)
+      ) {
+        console.warn('[SignalingClient] Already connected or connecting.');
+        if (this.ws.readyState === WebSocket.OPEN) resolve();
+        return;
+      }
+
+      // this.callbacks = callbacks; // 移除这行
+      const fullUrl = `${this.serverUrlBase}${
+        this.serverUrlBase.endsWith('/') ? '' : '/'
+      }signaling`;
+      console.log(`[SignalingClient] Connecting to: ${fullUrl}.........`);
+      this.ws = new WebSocket(fullUrl);
+
+      this.ws.onopen = () => {
+        console.log('[SignalingClient] WebSocket connection established.');
+        this.connected = true;
+        this._emit('connected', undefined); // 使用 _emit 触发 'connected' 事件
+        this._sendPing();
+        resolve();
+      };
+
+      this.ws.onmessage = (event) => {
+        this._handleMessage(event);
+      };
+
+      this.ws.onerror = (errorEvent) => {
+        console.error('[SignalingClient] WebSocket error:', errorEvent);
+        this.connected = false;
+        this._emit('error', errorEvent); // 使用 _emit 触发 'error' 事件
+        reject(errorEvent);
+      };
+
+      this.ws.onclose = (closeEvent) => {
+        console.log(
+          `[SignalingClient] WebSocket connection closed. Code: ${closeEvent.code}, Reason: ${closeEvent.reason}`
+        );
+        this.connected = false;
+        this._emit('disconnected', closeEvent.reason); // 使用 _emit 触发 'disconnected' 事件
+        if (this.ws?.readyState !== WebSocket.OPEN) {
+          reject(
+            new Error(
+              `WebSocket closed before opening. Code: ${closeEvent.code}, Reason: ${closeEvent.reason}`
+            )
+          );
+        }
+      };
+    });
+  }
+
+  // --- 修改 _handleMessage 方法 ---
+
+  private _handleMessage(event: MessageEvent) {
+    try {
+      const message = JSON.parse(event.data as string) as
+        | SignalReceverMessage
+        | SignalPostMessage;
+      console.log(
+        `%c__收到websocket 事件_____ :` + message.event,
+        'background-color:aqua;',
+        message
+      );
+      switch (message.event) {
+        // ... 其他 case
+        // 将 this.callbacks.onEvent?.(data) 修改为 this._emit('event', data)
+
+        // 示例：
+        case '__answer':
+          // this.callbacks.onAnswer?.(message.data);
+          this._emit('answer', message.data); // 修改后
+          break;
+
+        case '_create':
+          console.log('______signal v2 create___');
+          if (typeof message.data.iceServers !== 'string') {
+            throw new Error('Invalid iceServers data type');
+          }
+          const iceServersData = coverIceServers(message.data.iceServers);
+          const createData = {
+            ...message.data,
+            iceServers: JSON.stringify(iceServersData),
+          };
+          // this.callbacks.onCreate?.(createData);
+          this._emit('create', createData); // 修改后
+          break;
+
+        case '_offer':
+          // this.callbacks.onOffer?.(message.data);
+          this._emit('offer', message.data); // 修改后
+          break;
+
+        case '_ice_candidate':
+          // this.callbacks.onDeviceIceCandidate?.(message.data);
+          this._emit('deviceIceCandidate', message.data); // 修改后
+          break;
+
+        case '__ice_candidate':
+          // this.callbacks.onClientIceCandidate?.(message.data);
+          this._emit('clientIceCandidate', message.data); // 修改后
+          break;
+
+        case '__code_rate':
+          this._emit('changeBitrate', message.data); // 修改后
+          break;
+
+        case '_pong':
+          this._emit('pong', undefined); // 修改后
+          break;
+        // ... 其他 case 也做类似修改
+
+        default:
+          console.warn(
+            '[SignalingClient] Received unknown message event:',
+            message
+          );
+      }
+    } catch (error) {
+      console.error(
+        '[SignalingClient] Error parsing message or in callback:',
+        error
+      );
+      this._emit('error', String(error)); // 在出错时也触发 'error' 事件
+    }
+  }
+
+  // ... 其他方法 (disconnect, sendOffer, sendAnswer 等) 保持不变 ...
+
+  public disconnect() {
+    console.log('断开连接++++1.0 ___v1');
+    if (this.ws) {
+      console.log('断开连接++++2.0 ___v1');
+      this.ws.close();
+    }
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+    }
+    // 确保在断开时也清除所有监听器，防止内存泄漏
+    this.removeAllListeners();
+    this.ws = null;
+    this.connected = false;
   }
 
   private _generateMessageId(): string {
@@ -109,160 +319,11 @@ export class SignalingClientV2 {
         '[SignalingClient] WebSocket not open. Cannot send message:',
         payload
       );
-      this.callbacks.onError?.('WebSocket not open');
-    }
-  }
-
-  connect(callbacks: SignalingCallbacks = {}): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (
-        this.ws &&
-        (this.ws.readyState === WebSocket.OPEN ||
-          this.ws.readyState === WebSocket.CONNECTING)
-      ) {
-        console.warn('[SignalingClient] Already connected or connecting.');
-        if (this.ws.readyState === WebSocket.OPEN) resolve();
-        return;
-      }
-
-      this.callbacks = callbacks;
-      const fullUrl = `${this.serverUrlBase}${
-        this.serverUrlBase.endsWith('/') ? '' : '/'
-      }signaling`; // ${this.meid}
-      console.log(`[SignalingClient] Connecting to: ${fullUrl}.........`);
-      this.ws = new WebSocket(fullUrl);
-
-      this.ws.onopen = () => {
-        console.log('[SignalingClient] WebSocket connection established.');
-        this.connected = true;
-        this.callbacks.onConnected?.();
-        this._sendPing();
-        resolve();
-      };
-      this.ws.onmessage = (event) => {
-        this._handleMessage(event);
-      };
-
-      this.ws.onerror = (errorEvent) => {
-        console.error('[SignalingClient] WebSocket error:', errorEvent);
-        this.connected = false;
-        this.callbacks.onError?.(errorEvent);
-        reject(errorEvent); // Reject promise on initial connection error
-      };
-
-      this.ws.onclose = (closeEvent) => {
-        console.log(
-          `[SignalingClient] WebSocket connection closed. Code: ${closeEvent.code}, Reason: ${closeEvent.reason}`
-        );
-        this.connected = false;
-        this.callbacks.onDisconnected?.(closeEvent.reason);
-        // If the promise hasn't resolved yet (e.g. immediate close after trying to open)
-        if (this.ws?.readyState !== WebSocket.OPEN) {
-          // Check if it didn't resolve via onopen
-          reject(
-            new Error(
-              `WebSocket closed before opening. Code: ${closeEvent.code}, Reason: ${closeEvent.reason}`
-            )
-          );
-        }
-      };
-    });
-  }
-
-  private _handleMessage(event: MessageEvent) {
-    try {
-      const message = JSON.parse(event.data as string) as
-        | SignalReceverMessage
-        | SignalPostMessage;
-      console.log(
-        `%c__收到websocket 事件_____ :` + message.event,
-        'background-color:aqua;',
-        message
-      );
-      switch (message.event) {
-        // 下面这些全是 设备端 接收到的消息
-        case '__call':
-          this.callbacks.onCall?.(message.data);
-          break;
-
-        case '__answer':
-          this.callbacks.onAnswer?.(message.data);
-          break;
-        // 下面这些全是 客户端 接收到的消息
-        case '_create':
-          console.log('______signal v2 create___');
-          if (typeof message.data.iceServers !== 'string') {
-            throw new Error('Invalid iceServers data type');
-          }
-          const iceServersData = coverIceServers(message.data.iceServers);
-
-          this.callbacks.onCreate?.({
-            ...message.data,
-            iceServers: JSON.stringify(iceServersData),
-          });
-          break;
-
-        case '_offer':
-          this.callbacks.onOffer?.(message.data);
-          break;
-
-        case '_ice_candidate':
-          const data = message.data;
-          this.callbacks.onDeviceIceCandidate?.(data);
-          break;
-
-        case '__ice_candidate':
-          this.callbacks.onClientIceCandidate?.(message.data);
-          break;
-
-        case '__code_rate':
-          this.callbacks.onChangeBitrate?.(message.data);
-          break;
-
-        case '_pong':
-          // console.log('____心肺复苏___');
-          break;
-
-        // 设备端断开连接
-        case '_offline':
-          break;
-
-        case '_connectinfo':
-          break;
-
-        case '_disconnected':
-          break;
-
-        default:
-          console.warn(
-            '[SignalingClient] Received unknown message event:',
-            message
-          );
-      }
-    } catch (error) {
-      console.error(
-        '[SignalingClient] Error parsing message or in callback:',
-        error
-      );
-      this.callbacks.onError?.(String(error));
     }
   }
 
   public isConnected(): boolean {
     return this.connected && this.ws?.readyState === WebSocket.OPEN;
-  }
-
-  public disconnect() {
-    console.log('断开连接++++1.0 ___v1');
-    if (this.ws) {
-      console.log('断开连接++++2.0 ___v1');
-      this.ws.close();
-    }
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-    }
-    this.ws = null;
-    this.connected = false;
   }
 
   /**
@@ -273,14 +334,13 @@ export class SignalingClientV2 {
   public initiateSession(peerId: string, sessionId: string) {
     this.to = peerId;
     this.sessionId = sessionId;
-    const message: SignalPostMessage = {
+    this._sendMessage({
       event: '__connectto',
       data: {
         ...this._buildBaseMessageData(),
         messageId: this._generateMessageId(),
       },
-    };
-    this._sendMessage(message);
+    });
   }
 
   public registerViewerId(viewerId: string) {
@@ -311,7 +371,8 @@ export class SignalingClientV2 {
     sessionId: string,
     options: CallOptions = {}
   ) {
-    const datachannel = options.datachannelEnable ? 'true' : 'false';
+    this.to = peerId;
+    this.sessionId = sessionId;
     const callData = {
       mode: this.connectmode,
       source: this.source,
@@ -324,23 +385,14 @@ export class SignalingClientV2 {
         iceservers: options.iceServers ?? '',
       }, // Usually true for video calls
     } as const;
-    // if (options.user) callData.user = options.user;
-    // if (options.pwd) callData.pwd = options.pwd;
-    // if (options.iceServers) {
-    //   // The PDF states: "iceservers": JSON.stringify(configuration)
-    //   // Assuming `configuration` means the ICE servers array.
-    //   callData.iceservers = options.iceServers;
-    // }
-
-    const message: SignalPostMessage = {
+    this._sendMessage({
       event: '__call',
       data: {
         ...this._buildBaseMessageData(),
         messageId: this._generateMessageId(),
         ...callData,
       },
-    };
-    this._sendMessage(message);
+    });
   }
 
   /**
@@ -380,23 +432,23 @@ export class SignalingClientV2 {
   /**
    * Sends an SDP answer.
    */
-  public sendAnswer(
-    sdp: string,
-    answerType: RTCSdpType
-    // peerId: string,
-    // sessionId: string
-  ) {
-    console.log('_____sendAnswer_____', this);
-    const message: SignalPostMessage = {
+  public sendAnswer(sdp: string, answerType: RTCSdpType) {
+    console.log('%c______发送answer_____', 'color:red', {
+      d: {
+        sdp,
+        answerType,
+        this: this,
+      },
+    });
+    this._sendMessage({
       event: '__answer',
       data: {
         ...this._buildBaseMessageData(),
         messageId: this._generateMessageId(),
-        sdp: sdp,
-        type: answerType, // e.g., "answer"
+        sdp,
+        type: answerType,
       },
-    };
-    this._sendMessage(message);
+    });
   }
 
   public sendChangeBitrate(bitrate: number, peerId: string, sessionId: string) {
@@ -411,23 +463,15 @@ export class SignalingClientV2 {
     this._sendMessage(message);
   }
 
-  /**
-   * Sends an ICE candidate.
-   * @param candidate The RTCIceCandidate object or its JSON representation.
-   * @param sdpMLineIndex The sdpMLineIndex from the candidate.
-   * @param peerId The ID of the peer.
-   * @param sessionId The current session ID.
-   */
   public clientSendIceCandidate(candidateInfo: string) {
-    const message: SignalPostMessage = {
+    this._sendMessage({
       event: '__ice_candidate',
       data: {
         ...this._buildBaseMessageData(),
         messageId: this._generateMessageId(),
         candidate: candidateInfo,
       },
-    };
-    this._sendMessage(message);
+    });
   }
 
   public deviceSendIceCandidate(
@@ -476,66 +520,3 @@ export class SignalingClientV2 {
     this._sendMessage(message);
   }
 }
-
-// Example Usage (Conceptual - you'll integrate this with your WebRTC logic)
-/*
-const myId = "browser123";
-const targetDeviceId = "device789";
-const signalingClient = new SignalingClient("wss://your-server.com/signal", myId);
-
-const currentSessionId = uuidv4(); // Application manages session IDs
-
-signalingClient.connect({
-  onConnected: () => {
-    console.log("Signaling connected!");
-    // Example: Browser initiates offer flow
-    signalingClient.initiateSession(targetDeviceId, currentSessionId);
-  },
-  onCreate: (iceServers, state, from, sessionId) => {
-    console.log("Received _create:", { iceServers, state, from, sessionId });
-    if (sessionId === currentSessionId && from === targetDeviceId) {
-      // Now we have ICE servers, we can prepare and send an offer
-      // pc.setConfiguration({ iceServers });
-      // const offer = await pc.createOffer();
-      // await pc.setLocalDescription(offer);
-      // signalingClient.sendOffer(offer.sdp, targetDeviceId, currentSessionId);
-    }
-  },
-  onAnswer: (sdp, type, from, sessionId) => {
-    console.log("Received answer:", { sdp, type, from, sessionId });
-    if (sessionId === currentSessionId && from === targetDeviceId) {
-      // await pc.setRemoteDescription({ type: 'answer', sdp });
-    }
-  },
-  onCandidate: (candidate, sdpMLineIndex, from, sessionId) => {
-    console.log("Received ICE candidate:", { candidate, sdpMLineIndex, from, sessionId });
-    if (sessionId === currentSessionId && from === targetDeviceId) {
-      // const rtcCandidate = new RTCIceCandidate({ candidate: candidate, sdpMLineIndex: sdpMLineIndex });
-      // await pc.addIceCandidate(rtcCandidate);
-    }
-  },
-  onOffer: async (sdp, type, from, sessionId, state) => {
-    console.log("Received offer:", { sdp, type, from, sessionId, state });
-    if (sessionId === currentSessionId && from === targetDeviceId) {
-        // This is for Device-Initiates-Offer flow, browser receives offer
-        // await pc.setRemoteDescription({ type: 'offer', sdp });
-        // const answer = await pc.createAnswer();
-        // await pc.setLocalDescription(answer);
-        // signalingClient.sendAnswer(answer.sdp, answer.type, targetDeviceId, currentSessionId);
-    }
-  },
-  onDisconnected: (reason) => {
-    console.log("Signaling disconnected:", reason);
-  },
-  onError: (error) => {
-    console.error("Signaling error:", error);
-  }
-});
-
-// WebRTC PeerConnection event for ICE candidates
-// pc.onicecandidate = (event) => {
-//   if (event.candidate) {
-//     signalingClient.sendCandidate(event.candidate.toJSON(), event.candidate.sdpMLineIndex, targetDeviceId, currentSessionId);
-//   }
-// };
-*/
