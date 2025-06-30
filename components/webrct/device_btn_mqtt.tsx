@@ -3,10 +3,9 @@ import { newGuid } from "@/lib/util";
 import React, { useCallback, useEffect, useRef } from "react";
 import { Pressable, View, Text, StyleSheet } from "react-native";
 import { useWebRTC } from "@/lib/rtc/hook";
-import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, MediaStreamTrack } from 'react-native-webrtc';
 import { CreateEventData, OfferReceverData } from "@/types/signal_v3";
-import { SignalingClientV3 } from "@/lib/websocket/SignalingClientV3";
 import type { State, RTCConectionState } from '@/lib/rtc/single';
+import { MqttSignalingClient } from "@/lib/mqtt/MqttSignalingClient";
 
 interface DeviceBtnProps {
   deviceId: string;
@@ -14,11 +13,11 @@ interface DeviceBtnProps {
 const user = 'root';
 const pwd = '123456';
 
-const wsUrl = process.env.EXPO_PUBLIC_WS_URL;
+const wsUrl = process.env.EXPO_PUBLIC_MQTT_URL_A;
 
 export default function DeviceBtn({ deviceId }: DeviceBtnProps) {
   const viewerId = useRef<string>(newGuid());
-  const wsRef = useRef<SignalingClientV3>(new SignalingClientV3(wsUrl, viewerId.current));
+  const wsRef = useRef<MqttSignalingClient>(new MqttSignalingClient(wsUrl, viewerId.current));
 
   const sessionIdRef = useRef(newGuid());
   const [rtcConnectState, setRtcConnectState] = React.useState<RTCConectionState | null>('closed');

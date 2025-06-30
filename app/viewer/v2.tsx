@@ -19,7 +19,7 @@ import { analyzeSdpForCodecs } from "@/lib/analyzeSdpForCodecs";
 // const peerId = 'RHZL-00-IFJF-779N-00000244';
 // const wsUrl = 'ws://webrtc.qq-kan.com/';
 const peerId = '111';
-const wsUrl = 'ws://192.168.3.65:8910';
+const wsUrl = process.env.EXPO_PUBLIC_WS_URL;
 
 export default function ViewerScreen() {
   // const [peerId, setUsePeerId] = useState<string>('');
@@ -89,7 +89,11 @@ export default function ViewerScreen() {
   }
 
   useEffect(() => {
-    connectSignaling(wsUrl);
+    if (wsUrl) {
+      connectSignaling(wsUrl);
+    } else {
+      console.log('wsUrl 未定义');
+    }
     return () => {
       if (signalingClientV2.current) {
         signalingClientV2.current.disconnect();

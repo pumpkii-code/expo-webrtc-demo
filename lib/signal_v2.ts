@@ -64,8 +64,8 @@ export class SignalingClientV2 {
       this.serverUrlBase = serverUrlBase;
     }
 
-    this.meid = meid;
-    console.log('_____this.meid_____', this.meid);
+    this.meid = '111';
+    console.log('_____this.meid2_____', this.meid);
   }
 
   private _generateMessageId(): string {

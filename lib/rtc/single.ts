@@ -113,6 +113,7 @@ class WebRTCManager {
       remoteStream: this.videoStream,
       callState: 'active',
     });
+    console.log('%c____触发了 track 事件_____', 'background: red');
   };
 
   private handelDataChannel = (
@@ -147,12 +148,16 @@ class WebRTCManager {
     }
   };
 
-  private handleSignalingstatechange() {
+  private handleSignalingstatechange = () => {
+    const newState = this.webrtcClient?.connectionState;
+    const state2 = this.webrtcClient?.signalingState;
     console.log(
       '%c_____7.3___ 收到 signalingstatechange 事件',
-      'background-color: black; color: white'
+      'background-color: black; color: white',
+      newState,
+      state2
     );
-  }
+  };
 
   private handleConnectionStateChange = () => {
     const newState = this.webrtcClient?.connectionState;
@@ -191,11 +196,12 @@ class WebRTCManager {
     );
   }
   private handleIceconnectionstatechange = () => {
+    const newState = this.webrtcClient?.connectionState;
     console.log(
-      '%c_____7.3___ 收到 signalingstatechange 事件',
-      'background-color: black; color: white'
+      '%c_____7.3.1___ 收到 signalingstatechange 事件',
+      'background-color: black; color: white',
+      newState
     );
-    const newState = this.webrtcClient?.iceConnectionState;
 
     // if (newState) {
     //   this.setState({

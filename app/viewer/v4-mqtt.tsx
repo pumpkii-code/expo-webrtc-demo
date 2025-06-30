@@ -1,4 +1,4 @@
-import DeviceBtn from '@/components/webrct/device_btn';
+import DeviceBtn from '@/components/webrct/device_btn_mqtt';
 import React, { useState } from 'react';
 import {
   View,
@@ -25,7 +25,6 @@ type DevicesMap = Record<string, Record<string, boolean>>;
 // 如果你在真实物理设备上运行，请将 'localhost' 替换为你电脑的局域网 IP 地址
 // (例如 'http://192.168.1.100:8910')
 // const SERVER_URL = 'http://192.168.3.65:8910'; // 默认为 Android 模拟器
-// const SERVER_URL = process.env.EXPO_PUBLIC_Request_URL; // 默认为 Android 模拟器
 const SERVER_URL = process.env.EXPO_PUBLIC_Request_URL_A; // 默认为 Android 模拟器
 
 export default function V3() {
@@ -35,15 +34,14 @@ export default function V3() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const { remoteStream } = useWebRTC();
-
   // 按钮点击时触发的函数，用于获取设备列表
   const handleFetchDevices = async () => {
     setIsLoading(true); // 开始加载，显示加载指示器
     setError(null); // 清除之前的错误信息
 
     try {
-      const response = await fetch(`${SERVER_URL}/mio/t1`);
+      // const response = await fetch(`${SERVER_URL}/mio/t1`);
+      const response = await fetch(`http://test-xm.pumpkii.click:7111/mio/t1`);
 
       if (!response.ok) {
         // 如果服务器返回非 2xx 的状态码，则抛出错误
@@ -61,17 +59,6 @@ export default function V3() {
   };
 
   const deviceIds = Object.keys(devices);
-
-  const connectToDevice = async (deviceId: string) => {
-
-  }
-
-  const watchVideoOnFullScreen = async () => {
-    console.log('lalalallalalalal')
-    router.push({
-      pathname: '/viewer/fullscreen',
-    })
-  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

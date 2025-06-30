@@ -68,7 +68,7 @@ export interface IceCandidateReceverData {
 }
 
 export interface OfferReceverData {
-  iceservers: string;
+  iceServers: string;
   state: 'successed';
   user?: string;
   sdp: string;

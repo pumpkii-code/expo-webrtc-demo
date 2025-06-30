@@ -17,12 +17,12 @@ export default function RouteScreen() {
   return (
     <SafeAreaView style={styles.container}>
 
-      <TextInput
+      {/* <TextInput
         style={styles.input}
         placeholder="输入设备号"
         onChangeText={setSerno}
         value={serno}
-      />
+      /> */}
 
       <Link
         href={{
@@ -32,6 +32,16 @@ export default function RouteScreen() {
         style={styles.link}
       >
         模拟 1
+      </Link>
+
+      <Link
+        href={{
+          pathname: '/viewer/v4-mqtt',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        mqtt模拟
       </Link>
 
       <Link
@@ -52,6 +62,26 @@ export default function RouteScreen() {
         style={styles.link}
       >
         我的直播间v2
+      </Link>
+
+      <Link
+        href={{
+          pathname: '/master/m_mqtt',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        mqtt 直播室
+      </Link>
+
+      <Link
+        href={{
+          pathname: '/master/m_ws',
+          params: { serno }
+        }}
+        style={styles.link}
+      >
+        ws 直播室
       </Link>
     </SafeAreaView>
   );
