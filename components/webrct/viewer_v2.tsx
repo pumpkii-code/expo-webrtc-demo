@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { View, Text, StyleSheet, ActivityIndicator, Button, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Button, Platform, Alert, NativeEventEmitter, NativeModules } from "react-native";
 import { RTCPeerConnection, RTCView, MediaStream, RTCSessionDescription, MediaStreamTrack, mediaDevices } from 'react-native-webrtc';
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
@@ -347,19 +347,76 @@ export default function PDRTCView({ rtcConfig, sdp, candidate, viewerId, onIceca
 
   }, [rtcDataChannel]);
 
+  // ====================================================================
+  // ======================== InCallManager 逻辑 ========================
+  // ====================================================================
+
   useEffect(() => {
-    try {
-      InCallManager.start({ media: 'audio' });
-      InCallManager.setForceSpeakerphoneOn(true);
-      console.log('扬声器已打开 (手动测试)');
-    } catch (e) {
-      console.error('手动测试扬声器失败:', e);
+    // 为 'WiredHeadset' 事件的载荷定义类型
+    interface WiredHeadsetEvent {
+      isPlugged: boolean;
+      hasMic: boolean;
+      deviceName: string;
     }
 
-    return () => {
-      InCallManager.stop();
+    /**
+     * @description 核心处理函数：根据有线耳机事件调整扬声器
+     * @param {WiredHeadsetEvent} event - 从 InCallManager 接收的事件对象
+     */
+    const handleWiredHeadsetChange = (event: WiredHeadsetEvent) => {
+      console.log('[InCallManager] WiredHeadset 事件触发:', event);
+      const { isPlugged } = event;
+
+      if (isPlugged) {
+        // 如果有线耳机插入，则必须关闭强制扬声器，让音频走耳机。
+        console.log('[InCallManager] 检测到有线耳机插入。取消强制扬声器。');
+        InCallManager.setForceSpeakerphoneOn(false);
+      } else {
+        // 如果有线耳机拔出（或未插入），我们同样关闭强制扬声器，
+        // 以便让系统能够自动选择使用蓝牙耳机（如果已连接）。
+        console.log('[InCallManager] 无有线耳机。取消强制扬声器以优先支持蓝牙/听筒。');
+        InCallManager.setForceSpeakerphoneOn(false);
+      }
+    };
+
+    // 1. 启动 InCallManager 服务
+    try {
+      InCallManager.start({ media: 'audio' });
+      console.log('[InCallManager] 服务启动成功');
+    } catch (e) {
+      console.error('[InCallManager] 服务启动失败:', e);
+      return;
     }
-  }, [])
+
+    // 2. 注册事件监听器
+    //    使用您截图中明确指出的、驼峰式的正确事件名
+    const eventEmitter = new NativeEventEmitter(NativeModules.InCallManager);
+    const subscription = eventEmitter.addListener(
+      'WiredHeadset', // <-- 这是根据您的报错截图修正的、最终且唯一的正确事件名称
+      handleWiredHeadsetChange
+    );
+    console.log("[InCallManager] 已注册 'WiredHeadset' 事件监听器");
+
+    // 3. 设置初始默认行为
+    //    最安全的默认行为是关闭强制扬声器，以支持任何已连接的耳机。
+    console.log('[InCallManager] 设置初始状态：取消强制扬声器。');
+    InCallManager.setForceSpeakerphoneOn(false);
+
+    // 4. 组件卸载时的清理函数
+    return () => {
+      console.log('[InCallManager] 正在清理...');
+      if (subscription) {
+        subscription.remove();
+        console.log("[InCallManager] 已移除 'WiredHeadset' 事件监听器");
+      }
+      InCallManager.stop();
+      console.log('[InCallManager] 服务已停止');
+    };
+  }, []); // 空依赖数组，确保此 effect 只在组件挂载和卸载时执行一次
+
+  // ====================================================================
+  // ===================== InCallManager 逻辑结束 =======================
+  // ====================================================================
 
   const getStatusMessage = () => {
     if (error && connectionState === 'connected') {
