@@ -16,7 +16,17 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tonyy0.expo-webrtc-demo",
-      "bitcode": false
+      "bitcode": false,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "test-xm.pumpkii.click": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -49,10 +59,7 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      "@config-plugins/react-native-webrtc"
-    ],
+    "plugins": ["expo-router", "@config-plugins/react-native-webrtc"],
     "experiments": {
       "typedRoutes": true
     }

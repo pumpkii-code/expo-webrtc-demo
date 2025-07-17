@@ -53,7 +53,7 @@ export class SignalingClientV3 {
       this.serverUrlBase = serverUrlBase;
     }
     this.meid = meid;
-    console.log('_____this.meid_____', this.meid);
+    console.log('_____this.meid3_____', this.meid);
   }
 
   // --- 新增的事件监听方法 ---
@@ -154,7 +154,7 @@ export class SignalingClientV3 {
         console.log('[SignalingClient] WebSocket connection established.');
         this.connected = true;
         this._emit('connected', undefined); // 使用 _emit 触发 'connected' 事件
-        this._sendPing();
+        // this._sendPing();
         resolve();
       };
 
@@ -194,7 +194,7 @@ export class SignalingClientV3 {
         | SignalReceverMessage
         | SignalPostMessage;
       console.log(
-        `%c__收到websocket 事件_____ :` + message.event,
+        `%c__收到websocket 事件_____ :XD_:` + message.event,
         'background-color:aqua;',
         message
       );
@@ -209,7 +209,7 @@ export class SignalingClientV3 {
           break;
 
         case '_create':
-          console.log('______signal v2 create___');
+          console.log('______signal v2 create___', message.data);
           if (typeof message.data.iceServers !== 'string') {
             throw new Error('Invalid iceServers data type');
           }
@@ -222,12 +222,21 @@ export class SignalingClientV3 {
           this._emit('create', createData); // 修改后
           break;
 
+        case '__call':
+          this._emit('call', message.data);
+          break;
+
         case '_offer':
           // this.callbacks.onOffer?.(message.data);
           this._emit('offer', message.data); // 修改后
           break;
 
+        case '__answer':
+          this._emit('answer', message.data);
+          break;
+
         case '_ice_candidate':
+          console.log('hahahahahahah');
           // this.callbacks.onDeviceIceCandidate?.(message.data);
           this._emit('deviceIceCandidate', message.data); // 修改后
           break;
@@ -422,7 +431,7 @@ export class SignalingClientV3 {
         sdp: sdp,
         type: 'offer', // Type is explicitly "offer"
         state: 'successed',
-        iceservers: '',
+        iceServers: '',
       },
     };
 

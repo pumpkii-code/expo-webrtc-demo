@@ -8,24 +8,25 @@ import {
   RTCSessionDescription
 } from 'react-native-webrtc';
 import { Text, View } from '@/components/Themed';
-import { SignalingClient } from '@/lib/signal';
 import { useRoute } from '@react-navigation/native';
-import { SignalingClientV2 } from '@/lib/signal_v2';
 import { newGuid } from '@/lib/util';
 import InCallManager from 'react-native-incall-manager';
 import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d.ts';
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
 import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
-import { preferCodec } from '@/lib/change_decode';
+import { CallPostData, BaseMessageData, IcePostData, IceCandidateReceverData } from "@/types/signal_v3";
+import { SignalingClientV3 } from '@/lib/websocket/SignalingClientV3';
 
 const wsUrl = process.env.EXPO_PUBLIC_WS_URL;
+// const wsUrl = process.env.EXPO_PUBLIC_MQTT_URL_B;
 
-export default function MasterScreen() {
+export default function MqttMaster() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { serno: peerId } = (useRoute().params ?? { serno: '' }) as { serno: string };
   const sessionIdRef = useRef<string | null>(null);
+  const deivceIdRef = useRef<string>(newGuid());
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const localStreamRef = useRef<MediaStream | null>(localStream);
   localStreamRef.current = localStream;
@@ -34,6 +35,12 @@ export default function MasterScreen() {
   audioDeviceIdRef.current = audioDevices;
   const dataChannelsRef = useRef<Map<string, RTCDataChannel>>(new Map());
   const webrtcInfoIntervalId = useRef<number | null>(null);
+
+  const deviceStream = useRef<MediaStream | null>(null);
+
+  // 使用 Map 存储每个观众的连接
+  const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const signalingClientV2 = useRef<SignalingClientV3 | null>(null);
 
   const changeBitrate = (data: { bitrate: number }, currentId: string) => {
 
@@ -99,10 +106,6 @@ export default function MasterScreen() {
       }
     });
   }
-
-  // 使用 Map 存储每个观众的连接
-  const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const signalingClientV2 = useRef<SignalingClientV2 | null>(null);
 
   const handleDataChannelOpen = (event: RTCDataChannelEvent<'open'>) => {
     console.log('Data channel opened for viewer:');
@@ -403,7 +406,7 @@ export default function MasterScreen() {
   };
 
   // 创建并发送 offer
-  const createAndSendOffer = async (viewerId: string, stream?: MediaStream) => {
+  const createAndSendOffer = async (viewerId: string, stream?: MediaStream | null) => {
     if (!stream) {
       console.error('[MASTER] 本地流未初始化');
       return;
@@ -426,7 +429,9 @@ export default function MasterScreen() {
       await peerConnection.setLocalDescription(offer);
 
 
+      console.log('%c______before sendOffer', 'color:red', signalingClientV2.current, sessionIdRef.current)
       if (signalingClientV2.current && sessionIdRef.current) {
+        console.log('%c______sendOffer', 'color:red', offer)
         const sendData = {
           sdp: offer.sdp,
           peerId: viewerId,
@@ -441,70 +446,85 @@ export default function MasterScreen() {
     }
   };
 
+  const handleCall = (data: CallPostData & BaseMessageData) => {
+    console.log('收到 call __在这里 sendOffer', data);
+    sessionIdRef.current = data.sessionId;
+    createAndSendOffer(data.from, deviceStream.current)
+  }
+
+  const handleDeviceIceCandidate = async (data: BaseMessageData & IcePostData) => {
+    console.log('%c____ihandleDeviceIceCandidate__', 'background:yellow', data);
+    const { from } = data;
+    const candidate = JSON.parse(data.candidate); // 解析 ICE candidate
+    console.log('收到 ICE candidate', data);
+    const peerConnection = peerConnections.current.get(from);
+    if (!peerConnection) {
+      console.error(`[MASTER] 未找到观众 ${from} 的连接`);
+      return;
+    }
+    try {
+      await peerConnection.addIceCandidate(candidate);
+      console.log(`[MASTER] 添加观众 ${from} 的 ICE candidate 成功 :D ____`); // 打印到 cons
+    } catch (err) {
+      console.error(`[MASTER] 添加观众 ${from} 的 ICE candidate 失败:`, err);
+    }
+
+  }
+
   // 连接信令服务器
-  const connectSignaling = (serverUrl: string, stream: MediaStream) => {
+  const connectSignaling = (serverUrl: string) => {
     console.log('开始连接信令服务器');
-    signalingClientV2.current = new SignalingClientV2(serverUrl, newGuid());
+    const signalingClient = new SignalingClientV3(serverUrl, deivceIdRef.current);
+    signalingClientV2.current = signalingClient;
 
-    signalingClientV2.current.connect({
-      onConnected: () => {
-        setConnected(true);
-        console.log('连接信令服务器成功');
-        signalingClientV2.current?.registerDevice();
-      },
-
-      onCall: (data) => {
-        console.log('收到呼叫', data);
-        sessionIdRef.current = data.sessionId;
-        createAndSendOffer(data.from, stream);
-      },
-
-      onAnswer: (data) => {
-        console.log('%c____收到回答_____', 'background: yellow', data);
-        const peerConnection = peerConnections.current.get(data.from);
-        if (peerConnection) {
-          peerConnection.setRemoteDescription(new RTCSessionDescription({
-            sdp: data.sdp,
-            type: data.type as RTCSdpType,
-          }));
-        }
-      },
-
-      // onOffer: async (data) => {
-      //   console.log('%c____收到来自 client 的 offer_____002', 'background: yellow', data);
-      //   sessionIdRef.current = data.sessionId;
-      //   const peerConnection = peerConnections.current.get(data.from);
-      //   await peerConnection?.createAnswer().then((answer) => {
-      //     console.log('%c____收到来自 client 的 offer_____001', 'background: yellow', data);
-      //     peerConnection?.setLocalDescription(answer);
-      //   });
-      // },
-
-      onClientIceCandidate: async (data) => {
-        const { from } = data;
-        const candidate = JSON.parse(data.candidate); // 解析 ICE candidate
-        console.log('收到 ICE candidate', data);
-        const peerConnection = peerConnections.current.get(from);
-        if (!peerConnection) {
-          console.error(`[MASTER] 未找到观众 ${from} 的连接`);
-          return;
-        }
-        try {
-          await peerConnection.addIceCandidate(candidate);
-          console.log(`[MASTER] 添加观众 ${from} 的 ICE candidate 成功 :D ____`); // 打印到 cons
-        } catch (err) {
-          console.error(`[MASTER] 添加观众 ${from} 的 ICE candidate 失败:`, err);
-        }
-      },
+    signalingClient.on('connected', () => {
+      console.log('已连接到信令服务器');
+      setConnected(true);
+      signalingClient.registerDevice();
     });
+
+    signalingClient.on('call', handleCall);
+
+    // signalingClient.on('offer', (data) => {
+    //   console.log('Received "offer":', data);
+    //   // 处理收到的 offer
+    // });
+
+    signalingClient.on('answer', (data) => {
+      const peerConnection = peerConnections.current.get(data.from);
+      if (peerConnection) {
+        console.log('%c_____peerConnection', 'color: red', { data })
+        peerConnection.setRemoteDescription(new RTCSessionDescription({
+          sdp: data.sdp,
+          type: data.type as RTCSdpType,
+        }));
+      }
+    });
+
+    signalingClient.on('clientIceCandidate', handleDeviceIceCandidate);
+
+    signalingClient.on('disconnected', (reason) => {
+      console.log('Disconnected from signaling server:', reason);
+    });
+
+    signalingClient.connect()
+      .then(() => {
+        // 现在可以开始信令交换了
+        // 例如，viewer 发起会话
+        // signalingClient.initiateSession('device-123', 'some-session-id');
+      })
+      .catch(error => {
+        console.error('Failed to connect:', error);
+      });
   };
 
   // 开始推流
   const startBroadcasting = async () => {
     console.log('[MASTER] 开始推流');
     const stream = await setupCamera();
+    deviceStream.current = stream;
     if (stream && wsUrl) {
-      connectSignaling(wsUrl, stream);
+      connectSignaling(wsUrl);
     }
     return stream
   };
@@ -571,6 +591,7 @@ export default function MasterScreen() {
         )}
         {localStream && (
           <>
+            <Text style={{ color: 'white', backgroundColor: 'black' }}>{deivceIdRef.current}</Text>
             <RTCView
               streamURL={localStream.toURL()}
               style={styles.stream}

@@ -8,7 +8,6 @@ import {
   RTCSessionDescription
 } from 'react-native-webrtc';
 import { Text, View } from '@/components/Themed';
-import { SignalingClient } from '@/lib/signal';
 import { useRoute } from '@react-navigation/native';
 import { SignalingClientV2 } from '@/lib/signal_v2';
 import { newGuid } from '@/lib/util';
@@ -17,7 +16,6 @@ import type MessageEvent from 'react-native-webrtc/lib/typescript/MessageEvent.d
 import type RTCDataChannel from 'react-native-webrtc/lib/typescript/RTCDataChannel.d.ts';
 import type RTCDataChannelEvent from 'react-native-webrtc/lib/typescript/RTCDataChannelEvent.d.ts'
 import { RTCDataChannelSendMessageProps } from "@/components/type/signal_v2";
-import { preferCodec } from '@/lib/change_decode';
 
 const wsUrl = process.env.EXPO_PUBLIC_WS_URL;
 
